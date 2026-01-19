@@ -1,0 +1,198 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum HouseholdRole {
+  ADMIN
+  MEMBER
+}
+
+enum TaskStatus {
+  OPEN
+  DONE
+}
+
+enum RecurrenceType {
+  NONE
+  DAILY
+  WEEKLY
+  MONTHLY
+  CUSTOM
+}
+
+enum RecurrenceUnit {
+  DAY
+  WEEK
+  MONTH
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  createdAt    DateTime @default(now())
+
+  memberships       HouseholdMember[]
+  createdHouseholds Household[] @relation("HouseholdCreatedBy")
+  createdTasks      Task[]      @relation("TaskCreatedBy")
+
+  acceptedInvites Invite[] @relation("InviteAcceptedBy")
+  assignedTasks   Task[]   @relation("TaskAssignedTo")
+
+  passwordResetTokens PasswordResetToken[]
+
+  // Shopping
+  createdShoppingItems   ShoppingItem[] @relation("ShoppingItemCreatedBy")
+  purchasedShoppingItems ShoppingItem[] @relation("ShoppingItemPurchasedBy")
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  userId    String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Household {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+
+  createdById String
+  createdBy   User   @relation("HouseholdCreatedBy", fields: [createdById], references: [id])
+
+  members    HouseholdMember[]
+  invites    Invite[]
+  categories Category[]
+  tasks      Task[]
+
+  // Shopping
+  shoppingItems ShoppingItem[]
+}
+
+model HouseholdMember {
+  id          String        @id @default(cuid())
+  householdId String
+  userId      String
+  role        HouseholdRole @default(MEMBER)
+  joinedAt    DateTime      @default(now())
+
+  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([householdId, userId])
+}
+
+model Invite {
+  id           String   @id @default(cuid())
+  token        String   @unique
+  email        String?
+  householdId  String
+  createdAt    DateTime @default(now())
+  expiresAt    DateTime
+  acceptedAt   DateTime?
+  acceptedById String?
+
+  household  Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  acceptedBy User?     @relation("InviteAcceptedBy", fields: [acceptedById], references: [id])
+}
+
+model Category {
+  id          String  @id @default(cuid())
+  householdId String
+  name        String
+  color       String?
+
+  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  tasks     Task[]
+
+  @@unique([householdId, name])
+}
+
+model Task {
+  id          String     @id @default(cuid())
+  householdId String
+  title       String
+  description String?
+  dueAt       DateTime
+  allDay      Boolean    @default(false)
+  status      TaskStatus @default(OPEN)
+
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  assignedToId String?
+  assignedTo   User? @relation("TaskAssignedTo", fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  createdById String
+  createdBy   User @relation("TaskCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
+
+  // ===== Recurrence (Series Rule) =====
+  recurrenceType       RecurrenceType @default(NONE)
+  recurrenceInterval   Int            @default(1)
+  recurrenceUnit       RecurrenceUnit?
+  recurrenceByWeekday  Json?
+  recurrenceByMonthday Int?
+  recurrenceEndAt      DateTime?
+
+  occurrences TaskOccurrence[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  @@index([householdId, dueAt])
+  @@index([assignedToId])
+  @@index([categoryId])
+}
+
+model TaskOccurrence {
+  id           String     @id @default(cuid())
+  taskId       String
+  occurrenceAt DateTime
+  status       TaskStatus @default(OPEN)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, occurrenceAt])
+  @@index([occurrenceAt])
+  @@index([taskId])
+}
+
+model ShoppingItem {
+  id          String   @id @default(cuid())
+  householdId String
+  name        String
+  quantity    String?
+  note        String?
+  isPurchased Boolean  @default(false)
+  purchasedAt DateTime?
+  purchasedById String?
+
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  household  Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  createdBy  User      @relation("ShoppingItemCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
+  purchasedBy User?    @relation("ShoppingItemPurchasedBy", fields: [purchasedById], references: [id], onDelete: SetNull)
+
+  @@index([householdId, createdAt])
+  @@index([householdId, isPurchased])
+}

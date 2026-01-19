@@ -1,0 +1,8 @@
+node_modules
+dist
+build
+.vscode
+.DS_Store
+.env
+server/dev.db
+server/prisma/dev.db
