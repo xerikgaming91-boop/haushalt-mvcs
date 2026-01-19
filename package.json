@@ -8,14 +8,15 @@
     "dev:server": "nodemon src/server.js",
     "dev:client": "npm --prefix client run dev",
 
-    "start": "node src/server.js",
-    "start:client": "npm --prefix client run preview",
+    "build": "npm --prefix client install --include=dev && npm --prefix client run build",
+    "build:client": "npm --prefix client install --include=dev && npm --prefix client run build",
 
-    "build": "npm --prefix client run build",
-    "build:client": "npm --prefix client run build",
+    "start": "node src/server.js",
 
     "migrate": "prisma migrate dev",
-    "studio": "prisma studio"
+    "studio": "prisma studio",
+
+    "postinstall": "npm --prefix client install --include=dev"
   },
   "dependencies": {
     "@prisma/client": "^6.0.0",
