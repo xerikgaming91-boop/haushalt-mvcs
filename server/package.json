@@ -4,13 +4,9 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "predev": "prisma generate",
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
-
-    "prisma:generate": "prisma generate",
     "migrate": "prisma migrate dev",
-    "db:push": "prisma db push",
     "studio": "prisma studio"
   },
   "dependencies": {
