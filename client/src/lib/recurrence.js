@@ -41,6 +41,13 @@ function addDays(d, days) {
   return x;
 }
 
+function localDayNumber(d) {
+  // Use local noon to avoid DST edge cases around midnight.
+  return Math.floor(
+    new Date(d.getFullYear(), d.getMonth(), d.getDate(), 12, 0, 0, 0).getTime() / 86400000
+  );
+}
+
 function addMonthsKeepDayClamp(base, monthsToAdd, dayOfMonth, timeRef) {
   const y = base.getFullYear();
   const m0 = base.getMonth() + monthsToAdd;
@@ -108,8 +115,21 @@ export function expandTaskToOccurrences(task, from, to) {
   const effectiveType = type === "CUSTOM" ? unit : type; // CUSTOM uses unit
 
   if (effectiveType === "DAILY" || effectiveType === "DAY") {
-    // Step by N days
-    let cursor = new Date(start);
+    // Step by N days (jump close to range start to avoid iterating from far in the past)
+    const dayDiff = localDayNumber(from) - localDayNumber(start);
+    const stepsToFrom = Math.max(0, Math.ceil(dayDiff / interval));
+    let cursor = addDays(start, stepsToFrom * interval);
+
+    // If range start is within the same day but earlier than the task time, ensure we don't skip
+    // the first valid occurrence.
+    if (cursor.getTime() < start.getTime()) cursor = new Date(start);
+
+    // If cursor is still before range start (can happen with DST / rounding), advance once.
+    while (cursor.getTime() < fromMs && count < HARD_CAP) {
+      cursor = addDays(cursor, interval);
+      count++;
+    }
+
     while (cursor.getTime() <= toMs && count < HARD_CAP) {
       if (!pushIfInRange(cursor)) break;
       cursor = addDays(cursor, interval);
@@ -125,17 +145,36 @@ export function expandTaskToOccurrences(task, from, to) {
         : [weekday0Mon(start)];
 
     // Determine the first week start (Mon)
-    let weekStart = startOfWeekMonday(start);
+    const seriesWeekStart = startOfWeekMonday(start);
+    const rangeWeekStart = startOfWeekMonday(from);
+
+    // Jump close to the requested range. Align by interval weeks.
+    const dayDiff = localDayNumber(rangeWeekStart) - localDayNumber(seriesWeekStart);
+    const weekDiff = Math.floor(dayDiff / 7);
+    const baseSteps = Math.max(0, Math.floor(weekDiff / interval));
+    let weekStart = addDays(seriesWeekStart, baseSteps * interval * 7);
+
+    // Ensure we are not still before the range week start.
+    while (weekStart.getTime() < rangeWeekStart.getTime() && count < HARD_CAP) {
+      weekStart = addDays(weekStart, interval * 7);
+      count++;
+    }
 
     // Iterate weeks
     while (weekStart.getTime() <= toMs && count < HARD_CAP) {
       for (const wd of weekdays) {
         const occurrenceDate = addDays(weekStart, wd);
-        const dt = dateWithSameTime(start, occurrenceDate.getFullYear(), occurrenceDate.getMonth(), occurrenceDate.getDate());
+        const dt = dateWithSameTime(
+          start,
+          occurrenceDate.getFullYear(),
+          occurrenceDate.getMonth(),
+          occurrenceDate.getDate()
+        );
 
         // do not include occurrences before the series start
         if (dt.getTime() < start.getTime()) continue;
 
+        if (dt.getTime() < fromMs) continue;
         if (dt.getTime() > toMs) continue;
         if (!pushIfInRange(dt)) return out;
 
@@ -151,13 +190,32 @@ export function expandTaskToOccurrences(task, from, to) {
 
   if (effectiveType === "MONTHLY" || effectiveType === "MONTH") {
     const dom = byMonthday || start.getDate();
-    // Start at the month of start, step months
-    let months = 0;
+    // Start close to the range start month, step by interval months.
+    const startMonthIndex = start.getFullYear() * 12 + start.getMonth();
+    const fromMonthIndex = from.getFullYear() * 12 + from.getMonth();
+    const monthDiff = fromMonthIndex - startMonthIndex;
+    const baseSteps = Math.max(0, Math.floor(monthDiff / interval));
+    let months = baseSteps * interval;
+
+    // Ensure the computed first candidate is not before range start.
+    let first = addMonthsKeepDayClamp(start, months, dom, start);
+    while (first.getTime() < fromMs && count < HARD_CAP) {
+      months += interval;
+      first = addMonthsKeepDayClamp(start, months, dom, start);
+      count++;
+    }
+
     while (count < HARD_CAP) {
       const dt = addMonthsKeepDayClamp(start, months, dom, start);
 
       if (dt.getTime() < start.getTime()) {
         months += interval;
+        continue;
+      }
+
+      if (dt.getTime() < fromMs) {
+        months += interval;
+        count++;
         continue;
       }
 
