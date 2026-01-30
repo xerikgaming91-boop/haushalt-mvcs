@@ -40,8 +40,14 @@ export function useShoppingController(activeHouseholdId) {
   const createItem = useCallback(
     async (dto) => {
       setError("");
-      await shoppingService.create(dto);
-      await reload();
+      try {
+        await shoppingService.create(dto);
+        await reload();
+        return { ok: true };
+      } catch (e) {
+        setError(e.message);
+        return { ok: false, error: e.message };
+      }
     },
     [reload]
   );
@@ -49,8 +55,14 @@ export function useShoppingController(activeHouseholdId) {
   const togglePurchased = useCallback(
     async (item) => {
       setError("");
-      await shoppingService.update(item.id, { isPurchased: !item.isPurchased });
-      await reload();
+      try {
+        await shoppingService.update(item.id, { isPurchased: !item.isPurchased });
+        await reload();
+        return { ok: true };
+      } catch (e) {
+        setError(e.message);
+        return { ok: false, error: e.message };
+      }
     },
     [reload]
   );
@@ -58,8 +70,14 @@ export function useShoppingController(activeHouseholdId) {
   const updateItem = useCallback(
     async (id, patch) => {
       setError("");
-      await shoppingService.update(id, patch);
-      await reload();
+      try {
+        await shoppingService.update(id, patch);
+        await reload();
+        return { ok: true };
+      } catch (e) {
+        setError(e.message);
+        return { ok: false, error: e.message };
+      }
     },
     [reload]
   );
@@ -67,8 +85,14 @@ export function useShoppingController(activeHouseholdId) {
   const removeItem = useCallback(
     async (id) => {
       setError("");
-      await shoppingService.remove(id);
-      await reload();
+      try {
+        await shoppingService.remove(id);
+        await reload();
+        return { ok: true };
+      } catch (e) {
+        setError(e.message);
+        return { ok: false, error: e.message };
+      }
     },
     [reload]
   );

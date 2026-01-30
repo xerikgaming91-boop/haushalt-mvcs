@@ -79,50 +79,52 @@ export function useTaskRangeController(activeHouseholdId, fromDate, toDate) {
     return m;
   }, [occurrences]);
 
+  // ✅ Schritt 18: Serien-Gruppierung (Serie vs einzelne Occurrences)
   const seriesGroups = useMemo(() => {
-    // Group occurrences by their base task (series). Non-recurring tasks become a
-    // "series" with exactly one occurrence.
-    const byTaskId = new Map();
+    const map = new Map(); // taskId -> group
 
     for (const t of baseTasks || []) {
-      byTaskId.set(t.id, {
+      map.set(t.id, {
         task: t,
         occurrences: [],
         total: 0,
+        done: 0,
         open: 0,
-        done: 0
+        firstAt: null
       });
     }
 
     for (const o of occurrences || []) {
-      const g = byTaskId.get(o.taskId) || {
-        task: o.baseTask,
-        occurrences: [],
-        total: 0,
-        open: 0,
-        done: 0
-      };
+      const g =
+        map.get(o.taskId) ||
+        {
+          task: o.baseTask,
+          occurrences: [],
+          total: 0,
+          done: 0,
+          open: 0,
+          firstAt: null
+        };
+
       g.occurrences.push(o);
-      g.total += 1;
-      if (o.status === "DONE") g.done += 1;
-      else g.open += 1;
-      byTaskId.set(o.taskId, g);
+      map.set(o.taskId, g);
     }
 
-    const groups = Array.from(byTaskId.values())
-      .filter((g) => (g.occurrences || []).length > 0)
-      .map((g) => {
-        g.occurrences.sort((a, b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime());
-        return g;
-      });
+    const out = [];
+    for (const g of map.values()) {
+      if (!g.occurrences.length) continue;
 
-    groups.sort((a, b) => {
-      const ad = a.occurrences[0]?.dueAt ? new Date(a.occurrences[0].dueAt).getTime() : 0;
-      const bd = b.occurrences[0]?.dueAt ? new Date(b.occurrences[0].dueAt).getTime() : 0;
-      return ad - bd;
-    });
+      g.occurrences.sort((a, b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime());
+      g.total = g.occurrences.length;
+      g.done = g.occurrences.filter((x) => x.status === "DONE").length;
+      g.open = g.total - g.done;
+      g.firstAt = g.occurrences[0]?.dueAt || null;
 
-    return groups;
+      out.push(g);
+    }
+
+    out.sort((a, b) => new Date(a.firstAt).getTime() - new Date(b.firstAt).getTime());
+    return out;
   }, [baseTasks, occurrences]);
 
   const setOccurrenceStatus = useCallback(
@@ -184,7 +186,7 @@ export function useTaskRangeController(activeHouseholdId, fromDate, toDate) {
     error,
     baseTasks,
     occurrences,
-    seriesGroups,
+    seriesGroups, // ✅ neu
     statsByDay,
     reload,
     toggleOccurrence,

@@ -1,84 +1,150 @@
-:root { font-family: system-ui, Arial, sans-serif; }
-body { margin: 0; background: #0f172a; color: #e2e8f0; }
-a { color: #93c5fd; }
-.container { max-width: 1300px; margin: 0 auto; padding: 20px; }
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-.card { background: #111827; border: 1px solid #1f2937; border-radius: 12px; padding: 16px; }
-.row { display: flex; gap: 12px; flex-wrap: wrap; }
-.col { flex: 1; min-width: 280px; }
+/* ===== Base Theme ===== */
+@layer base {
+  :root {
+    color-scheme: dark;
+    font-family: system-ui, Arial, sans-serif;
+  }
 
-input, select, button, textarea {
-  background: #0b1220;
-  color: #e2e8f0;
-  border: 1px solid #243047;
-  border-radius: 10px;
-  padding: 10px 12px;
+  body {
+    margin: 0;
+    @apply bg-slate-950 text-slate-200;
+  }
+
+  a {
+    @apply text-sky-300 hover:text-sky-200;
+  }
+
+  h1, h2, h3 {
+    @apply font-semibold tracking-tight;
+    margin: 0 0 12px 0;
+  }
+
+  hr {
+    border: none;
+    @apply border-t border-slate-800;
+    margin: 14px 0;
+  }
+
+  small.muted {
+    @apply text-slate-400;
+  }
+
+  /* NOTE:
+     @tailwindcss/forms setzt Inputs standardmäßig hell.
+     Wir stylen NICHT global "input" (zu unspezifisch),
+     sondern die relevanten Input-Typen + select/textarea. */
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="search"],
+  input[type="number"],
+  input[type="date"],
+  input[type="datetime-local"],
+  textarea,
+  select {
+    @apply text-slate-100 placeholder:text-slate-500
+      bg-slate-950/40 border border-slate-700
+      rounded-xl px-3 py-2;
+  }
+
+  input[type="checkbox"],
+  input[type="radio"] {
+    @apply text-blue-500 border-slate-700 bg-slate-950/40 rounded;
+  }
+
+  input:focus,
+  select:focus,
+  textarea:focus,
+  button:focus {
+    @apply outline-none ring-2 ring-blue-500/50 ring-offset-2 ring-offset-slate-950;
+  }
 }
-button { cursor: pointer; }
-button.primary { background: #1d4ed8; border-color: #1d4ed8; }
-button.danger { background: #991b1b; border-color: #991b1b; }
 
-h1,h2,h3 { margin: 0 0 12px 0; }
-small.muted { color: #94a3b8; }
+/* ===== Reusable UI building blocks (Tailwind “presets”) ===== */
+@layer components {
+  .ui-card {
+    @apply rounded-2xl border border-slate-800 bg-slate-900/55 p-4 shadow-soft;
+  }
 
-hr { border: none; border-top: 1px solid #1f2937; margin: 14px 0; }
+  .ui-card-subtle {
+    @apply rounded-2xl border border-slate-800 bg-slate-950/30 p-4;
+  }
 
-.task { display: flex; justify-content: space-between; gap: 12px; padding: 10px; border: 1px solid #1f2937; border-radius: 10px; }
-.task.done { opacity: 0.65; text-decoration: line-through; }
-.badge { display: inline-block; padding: 2px 8px; border: 1px solid #334155; border-radius: 999px; font-size: 12px; color: #cbd5e1; }
+  .ui-section-title {
+    @apply text-base font-semibold;
+  }
 
-/* ===== Status pill (Open/Done) ===== */
-.statusPill {
-  flex: 0 0 auto;
-  align-self: flex-start;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 2px 10px;
-  border-radius: 999px;
-  border: 1px solid #334155;
-  font-size: 12px;
-  line-height: 18px;
-  color: #cbd5e1;
-  text-decoration: none;
+  .ui-muted {
+    @apply text-sm text-slate-400;
+  }
+
+  .ui-pill {
+    @apply inline-flex items-center rounded-full border border-slate-700 bg-slate-950/30
+      px-2.5 py-0.5 text-xs text-slate-200;
+  }
+
+  /* Forms (Tailwind forms plugin utilities + dark theme) */
+  .ui-input {
+    @apply form-input w-full
+      bg-slate-950/40 border-slate-700 text-slate-100
+      rounded-xl px-3 py-2
+      focus:border-blue-500 focus:ring-blue-500/50;
+  }
+
+  .ui-select {
+    @apply form-select w-full
+      bg-slate-950/40 border-slate-700 text-slate-100
+      rounded-xl px-3 py-2 pr-10
+      focus:border-blue-500 focus:ring-blue-500/50;
+  }
+
+  .ui-checkbox {
+    @apply form-checkbox
+      rounded border-slate-700 bg-slate-950/40
+      text-blue-500 focus:ring-blue-500/50;
+  }
+
+  /* Buttons */
+  .ui-btn {
+    @apply inline-flex items-center justify-center gap-2
+      rounded-xl border border-slate-700 bg-slate-950/30
+      px-3 py-2 text-sm font-medium text-slate-200
+      hover:bg-slate-900/40 hover:border-slate-600
+      disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .ui-btn-primary {
+    @apply ui-btn border-blue-600 bg-blue-600/90 hover:bg-blue-500 hover:border-blue-500 text-white;
+  }
+
+  .ui-btn-danger {
+    @apply ui-btn border-red-600 bg-red-600/90 hover:bg-red-500 hover:border-red-500 text-white;
+  }
+
+  /* Segmented chip buttons */
+  .ui-chip {
+    @apply rounded-full px-3 py-1.5 text-sm font-medium border transition;
+  }
+
+  .ui-chip-on {
+    @apply ui-chip border-blue-500/70 bg-blue-500/10 text-slate-100;
+  }
+
+  .ui-chip-off {
+    @apply ui-chip border-slate-800 bg-slate-950/30 text-slate-200 hover:border-slate-600 hover:bg-slate-900/40;
+  }
+
+  /* Layout helpers you already use */
+  .container {
+    @apply max-w-6xl mx-auto px-5 py-5;
+  }
 }
-.statusPill.open { border-color: #3b82f6; }
-.statusPill.done { border-color: #22c55e; }
 
-/* ===== Shopping list ===== */
-.shoppingRow {
-  border: 1px solid #1f2937;
-  border-radius: 12px;
-  padding: 12px;
-  background: #0b1220;
-  display: grid;
-  gap: 10px;
-}
-.shoppingRow.purchased {
-  opacity: 0.75;
-}
-.shoppingEdit {
-  border-top: 1px solid #1f2937;
-  padding-top: 12px;
-}
-
-/* ===== Weekday picker ===== */
-.weekdayPicker input[type="checkbox"] { width: 14px; height: 14px; margin: 0; }
-.weekdayRow { display: flex; gap: 8px; flex-wrap: wrap; }
-.weekdayChip {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  border-radius: 999px;
-  border: 1px solid #243047;
-  background: #0b1220;
-  cursor: pointer;
-  user-select: none;
-}
-.weekdayChip.on { border-color: #3b82f6; }
-
-/* ===== Calendar base ===== */
+/* ===== Existing Special CSS (react-calendar etc.) ===== */
 .calWrap .react-calendar {
   width: 100%;
   max-width: 100%;
@@ -87,7 +153,6 @@ hr { border: none; border-top: 1px solid #1f2937; margin: 14px 0; }
   color: #e2e8f0;
 }
 
-/* ===== Calendar layout: two clear panels ===== */
 .calendarGrid {
   display: grid;
   grid-template-columns: minmax(420px, 520px) minmax(360px, 1fr);
@@ -96,9 +161,9 @@ hr { border: none; border-top: 1px solid #1f2937; margin: 14px 0; }
 }
 
 .calendarPanel {
-  background: #0b1220;
-  border: 1px solid #243047;
-  border-radius: 12px;
+  background: rgba(2, 6, 23, 0.35);
+  border: 1px solid rgb(51 65 85);
+  border-radius: 16px;
   padding: 12px;
   min-width: 0;
   overflow: hidden;
@@ -107,12 +172,11 @@ hr { border: none; border-top: 1px solid #1f2937; margin: 14px 0; }
 .panelHeader { display: grid; gap: 4px; margin-bottom: 10px; }
 .panelTitle { font-weight: 700; font-size: 16px; }
 
-/* ===== React Calendar dark styling ===== */
 .calWrap .react-calendar__navigation { display: flex; gap: 6px; margin-bottom: 10px; }
 .calWrap .react-calendar__navigation button {
-  background: #0b1220;
-  border: 1px solid #243047;
-  border-radius: 10px;
+  background: rgba(2, 6, 23, 0.35);
+  border: 1px solid rgb(51 65 85);
+  border-radius: 12px;
   padding: 8px 10px;
   color: #e2e8f0;
 }
@@ -127,89 +191,16 @@ hr { border: none; border-top: 1px solid #1f2937; margin: 14px 0; }
 
 .calWrap .react-calendar__tile {
   position: relative;
-  background: #0b1220;
-  border: 1px solid #243047;
-  border-radius: 10px;
+  background: rgba(2, 6, 23, 0.35);
+  border: 1px solid rgb(51 65 85);
+  border-radius: 12px;
   color: #e2e8f0;
   padding: 10px 8px 28px;
 }
 .calWrap .react-calendar__tile:enabled:hover { border-color: #64748b; }
 .calWrap .react-calendar__tile--now { border-color: #64748b; }
-.calWrap .react-calendar__tile--active { border-color: #3b82f6; background: #0b1220; }
+.calWrap .react-calendar__tile--active { border-color: #3b82f6; background: rgba(2, 6, 23, 0.35); }
 .calWrap .react-calendar__tile abbr { position: relative; z-index: 1; }
 
 .calTileOpen { border-color: #3b82f6 !important; }
 .calTileDone { border-color: #22c55e !important; }
-
-.calIndicators {
-  position: absolute;
-  left: 6px;
-  bottom: 6px;
-  display: inline-flex;
-  gap: 8px;
-  align-items: center;
-  pointer-events: none;
-  z-index: 0;
-}
-
-.calIndicatorGroup { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: #cbd5e1; }
-.calIndicatorDot {
-  width: 8px; height: 8px; border-radius: 999px;
-  border: 1px solid #334155; background: #0f172a;
-}
-.calIndicatorDot.open { border-color: #3b82f6; }
-.calIndicatorDot.done { border-color: #22c55e; }
-.calIndicatorText { font-size: 11px; line-height: 1; opacity: 0.95; }
-
-.calIndicatorLegend {
-  display: inline-block;
-  width: 10px; height: 10px;
-  border-radius: 999px;
-  border: 1px solid #334155;
-  background: #0f172a;
-  vertical-align: -1px;
-  margin: 0 6px 0 0;
-}
-.calIndicatorLegend.open { border-color: #3b82f6; }
-.calIndicatorLegend.done { border-color: #22c55e; }
-
-/* ===== Sidebar Layout ===== */
-.appShell { display: flex; gap: 16px; align-items: flex-start; }
-.sidebar { width: 260px; flex: 0 0 260px; }
-
-.sidebarInner {
-  position: sticky;
-  top: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  background: #111827;
-  border: 1px solid #1f2937;
-  border-radius: 12px;
-  padding: 14px;
-  height: calc(100vh - 40px);
-}
-
-.appTitle { font-weight: 700; font-size: 18px; }
-.nav { display: flex; flex-direction: column; gap: 8px; }
-
-.navLink {
-  display: block;
-  padding: 10px 12px;
-  border-radius: 10px;
-  border: 1px solid transparent;
-  text-decoration: none;
-  color: #e2e8f0;
-}
-.navLink:hover { border-color: #243047; background: #0b1220; }
-.navLink.active { border-color: #3b82f6; background: #0b1220; }
-
-.sidebarFooter { margin-top: auto; display: flex; }
-.main { flex: 1; min-width: 0; }
-
-@media (max-width: 900px) {
-  .appShell { flex-direction: column; }
-  .sidebar { width: 100%; flex: 0 0 auto; }
-  .sidebarInner { height: auto; position: relative; top: 0; }
-  .calendarGrid { grid-template-columns: 1fr; }
-}

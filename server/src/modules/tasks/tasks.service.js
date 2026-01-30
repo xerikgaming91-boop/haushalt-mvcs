@@ -1,5 +1,6 @@
 import { AppError } from "../../common/errors/AppError.js";
 import { tasksRepository } from "./tasks.repository.js";
+import { prisma } from "../../prisma/client.js";
 
 function mapRecurrenceToDb(recurrence) {
   // Defaults
@@ -42,6 +43,9 @@ export const tasksService = {
 
     const from = new Date(fromIso);
     const to = new Date(toIso);
+    if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
+      throw new AppError("Invalid date range", 400);
+    }
 
     const tasks = await tasksRepository.listTasksForHousehold(householdId);
     const taskIds = tasks.map((t) => t.id);
@@ -74,18 +78,9 @@ export const tasksService = {
     return task;
   },
 
-  async setTaskStatus(userId, taskId, status) {
-    // In a full system you’d assert membership via join on task->household->members.
-    // For MVP: query task, then assert household membership.
-    const task = await tasksRepository.deleteTask(taskId).catch(() => null);
-    if (!task) throw new AppError("Task not found", 404);
-    // re-create task lookup (we used deleteTask accidentally? safeguard)
-    throw new AppError("Server misconfiguration: setTaskStatus not wired correctly", 500);
-  },
-
+  // Controller nutzt aktuell setTaskStatusSafe(...)
   async setTaskStatusSafe(userId, taskId, status) {
-    // Safe variant (correct):
-    const t = await (await import("../../prisma/client.js")).prisma.task.findUnique({
+    const t = await prisma.task.findUnique({
       where: { id: taskId },
       select: { id: true, householdId: true, recurrenceType: true }
     });
@@ -94,7 +89,7 @@ export const tasksService = {
     const member = await tasksRepository.assertMember(userId, t.householdId);
     if (!member) throw new AppError("Not allowed", 403);
 
-    // For non-recurring tasks, we allow direct status updates.
+    // Non-recurring tasks only via /status
     if (t.recurrenceType !== "NONE") {
       throw new AppError("Use occurrence endpoint for recurring tasks", 400);
     }
@@ -103,8 +98,13 @@ export const tasksService = {
     return { ok: true };
   },
 
+  // Optional: Alias, falls irgendwo noch setTaskStatus(...) direkt genutzt wird
+  async setTaskStatus(userId, taskId, status) {
+    return this.setTaskStatusSafe(userId, taskId, status);
+  },
+
   async setOccurrenceStatus(userId, taskId, occurrenceAtIso, status) {
-    const t = await (await import("../../prisma/client.js")).prisma.task.findUnique({
+    const t = await prisma.task.findUnique({
       where: { id: taskId },
       select: { id: true, householdId: true, recurrenceType: true }
     });
@@ -113,19 +113,23 @@ export const tasksService = {
     const member = await tasksRepository.assertMember(userId, t.householdId);
     if (!member) throw new AppError("Not allowed", 403);
 
+    // Für non-recurring interpretieren wir occurrence wie task-status
     if (t.recurrenceType === "NONE") {
-      // For non-recurring tasks, interpret this as setting the task itself
       await tasksRepository.setTaskStatus(taskId, status);
       return { ok: true };
     }
 
     const occurrenceAt = new Date(occurrenceAtIso);
+    if (Number.isNaN(occurrenceAt.getTime())) {
+      throw new AppError("Invalid occurrenceAt", 400);
+    }
+
     await tasksRepository.upsertOccurrenceStatus(taskId, occurrenceAt, status);
     return { ok: true };
   },
 
   async deleteTask(userId, taskId) {
-    const t = await (await import("../../prisma/client.js")).prisma.task.findUnique({
+    const t = await prisma.task.findUnique({
       where: { id: taskId },
       select: { id: true, householdId: true }
     });

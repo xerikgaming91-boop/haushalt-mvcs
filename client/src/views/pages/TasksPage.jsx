@@ -30,10 +30,42 @@ function toDateValue(d) {
   return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
 }
 
+function parseDateStart(dateValue) {
+  return new Date(`${dateValue}T00:00:00`);
+}
+
+function parseDateEnd(dateValue) {
+  return new Date(`${dateValue}T23:59:59`);
+}
+
 function endOfDayIso(dateValue) {
-  // dateValue: YYYY-MM-DD, interpreted as local date.
   const dt = new Date(`${dateValue}T23:59:59`);
   return dt.toISOString();
+}
+
+const WEEKDAY_LABELS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
+
+function SegBtn({ active, children, onClick, title }) {
+  return (
+    <button
+      type="button"
+      title={title}
+      onClick={onClick}
+      className={active ? "ui-chip-on" : "ui-chip-off"}
+    >
+      {children}
+    </button>
+  );
+}
+
+function Pill({ tone = "neutral", children }) {
+  const cls =
+    tone === "open"
+      ? "border-blue-500/60 bg-blue-500/10"
+      : tone === "done"
+      ? "border-emerald-500/60 bg-emerald-500/10"
+      : "border-slate-700 bg-slate-950/30";
+  return <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs ${cls}`}>{children}</span>;
 }
 
 function describeRecurrence(task) {
@@ -44,102 +76,163 @@ function describeRecurrence(task) {
   const unit = task.recurrenceUnit || "DAY";
   const effectiveType = type === "CUSTOM" ? unit : type;
 
-  if (effectiveType === "DAILY" || effectiveType === "DAY") {
-    return interval === 1 ? "Täglich" : `Alle ${interval} Tage`;
-  }
-  if (effectiveType === "WEEKLY" || effectiveType === "WEEK") {
-    return interval === 1 ? "Wöchentlich" : `Alle ${interval} Wochen`;
-  }
-  if (effectiveType === "MONTHLY" || effectiveType === "MONTH") {
-    return interval === 1 ? "Monatlich" : `Alle ${interval} Monate`;
-  }
-
+  if (effectiveType === "DAILY" || effectiveType === "DAY") return interval === 1 ? "Täglich" : `Alle ${interval} Tage`;
+  if (effectiveType === "WEEKLY" || effectiveType === "WEEK") return interval === 1 ? "Wöchentlich" : `Alle ${interval} Wochen`;
+  if (effectiveType === "MONTHLY" || effectiveType === "MONTH") return interval === 1 ? "Monatlich" : `Alle ${interval} Monate`;
   return "Wiederholung";
 }
-
-// bewusst umbenannt, damit es garantiert keine Kollision mehr gibt
-const WEEKDAY_LABELS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
 
 export function TasksPage() {
   const d = useDashboard();
 
-  const from = useMemo(() => addDays(new Date(), -7), []);
-  const to = useMemo(() => addDays(new Date(), 45), []);
-  const tc = useTaskRangeController(d.activeHouseholdId, from, to);
+  // ---------- Filter ----------
+  const [preset, setPreset] = useState("STANDARD"); // STANDARD | NEXT7 | NEXT30 | NEXT90 | CUSTOM
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
+  const [rangeFrom, setRangeFrom] = useState(() => toDateValue(addDays(new Date(), -7)));
+  const [rangeTo, setRangeTo] = useState(() => toDateValue(addDays(new Date(), 30)));
+
+  const [grouped, setGrouped] = useState(true);
+  const [statusFilter, setStatusFilter] = useState("ALL"); // ALL | OPEN | DONE
+
+  const applyPreset = (next) => {
+    const now = new Date();
+    if (next === "STANDARD") {
+      setRangeFrom(toDateValue(addDays(now, -7)));
+      setRangeTo(toDateValue(addDays(now, 30)));
+      setShowAdvanced(false);
+    } else if (next === "NEXT7") {
+      setRangeFrom(toDateValue(addDays(now, 0)));
+      setRangeTo(toDateValue(addDays(now, 7)));
+      setShowAdvanced(false);
+    } else if (next === "NEXT30") {
+      setRangeFrom(toDateValue(addDays(now, 0)));
+      setRangeTo(toDateValue(addDays(now, 30)));
+      setShowAdvanced(false);
+    } else if (next === "NEXT90") {
+      setRangeFrom(toDateValue(addDays(now, 0)));
+      setRangeTo(toDateValue(addDays(now, 90)));
+      setShowAdvanced(false);
+    } else {
+      setShowAdvanced(true);
+    }
+    setPreset(next);
+  };
+
+  const { fromDate, toDate, rangeWarning } = useMemo(() => {
+    let from = parseDateStart(rangeFrom);
+    let to = parseDateEnd(rangeTo);
+
+    let warning = "";
+    if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
+      warning = "Ungültiger Datumsbereich.";
+      from = parseDateStart(toDateValue(new Date()));
+      to = parseDateEnd(toDateValue(addDays(new Date(), 30)));
+    } else if (from.getTime() > to.getTime()) {
+      warning = "Startdatum liegt nach Enddatum. Bereich wurde getauscht.";
+      const tmpFrom = rangeTo;
+      const tmpTo = rangeFrom;
+      from = parseDateStart(tmpFrom);
+      to = parseDateEnd(tmpTo);
+    }
+
+    return { fromDate: from, toDate: to, rangeWarning: warning };
+  }, [rangeFrom, rangeTo]);
+
+  const tc = useTaskRangeController(d.activeHouseholdId, fromDate, toDate);
+
+  const rangeLabel = useMemo(() => `${fromDate.toLocaleDateString()} – ${toDate.toLocaleDateString()}`, [fromDate, toDate]);
+
+  const seriesGroups = useMemo(() => {
+    const groups = tc.seriesGroups || [];
+    if (statusFilter === "ALL") return groups;
+
+    const wantDone = statusFilter === "DONE";
+    return groups
+      .map((g) => {
+        const occ = (g.occurrences || []).filter((o) => (wantDone ? o.status === "DONE" : o.status !== "DONE"));
+        if (occ.length === 0) return null;
+
+        const done = occ.filter((o) => o.status === "DONE").length;
+        const open = occ.length - done;
+
+        return { ...g, occurrences: occ, total: occ.length, done, open };
+      })
+      .filter(Boolean);
+  }, [tc.seriesGroups, statusFilter]);
+
+  const flatOccurrences = useMemo(() => {
+    const occ = tc.occurrences || [];
+    if (statusFilter === "ALL") return occ;
+    if (statusFilter === "DONE") return occ.filter((o) => o.status === "DONE");
+    return occ.filter((o) => o.status !== "DONE");
+  }, [tc.occurrences, statusFilter]);
+
+  // ---------- Create Task ----------
   const [taskTitle, setTaskTitle] = useState("");
   const [taskDueAt, setTaskDueAt] = useState(() => toDatetimeLocalValue(new Date()));
   const [assignedToId, setAssignedToId] = useState("");
   const [categoryId, setCategoryId] = useState("");
 
-  // Recurrence UI State
   const [recType, setRecType] = useState("NONE"); // NONE|DAILY|WEEKLY|MONTHLY|CUSTOM
   const [recInterval, setRecInterval] = useState(1);
   const [recUnit, setRecUnit] = useState("DAY"); // for CUSTOM
   const [recWeekdays, setRecWeekdays] = useState([]); // 0..6 (Mo..So)
   const [recMonthday, setRecMonthday] = useState(() => new Date().getDate());
-
-  // Optional end
   const [recEndEnabled, setRecEndEnabled] = useState(false);
   const [recEndDate, setRecEndDate] = useState(""); // YYYY-MM-DD
 
   const [localErr, setLocalErr] = useState("");
 
-  const seriesGroups = tc.seriesGroups || [];
-
-  const recurringHint = useMemo(() => {
-    if (recType === "NONE") return "";
-    if (recType === "DAILY") return recInterval === 1 ? "Täglich" : `Alle ${recInterval} Tag(e)`;
-    if (recType === "WEEKLY") return recInterval === 1 ? "Wöchentlich" : `Alle ${recInterval} Woche(n)`;
-    if (recType === "MONTHLY") return recInterval === 1 ? "Monatlich" : `Alle ${recInterval} Monat(e)`;
-    return `Custom: alle ${recInterval} ${recUnit}`;
-  }, [recType, recInterval, recUnit]);
-
   const startInPast = useMemo(() => {
+    if (recType === "NONE") return false;
     const dt = new Date(taskDueAt);
     if (Number.isNaN(dt.getTime())) return false;
     return dt.getTime() < Date.now();
-  }, [taskDueAt]);
+  }, [taskDueAt, recType]);
 
   if (!d.activeHousehold) {
     return (
-      <div className="card">
-        <h2>Aufgaben</h2>
-        <small className="muted">
-          Bitte zuerst einen Haushalt auswählen/erstellen unter <Link to="/household">Haushalt</Link>.
-        </small>
+      <div className="ui-card">
+        <h2 className="text-lg font-semibold">Aufgaben</h2>
+        <p className="mt-1 text-sm text-slate-400">
+          Bitte zuerst einen Haushalt auswählen/erstellen unter{" "}
+          <Link className="text-sky-300 hover:text-sky-200" to="/household">
+            Haushalt
+          </Link>
+          .
+        </p>
       </div>
     );
   }
 
   return (
-    <div style={{ display: "grid", gap: 12 }}>
+    <div className="space-y-4">
       {(d.error || tc.error || localErr) && (
-        <div className="card" style={{ borderColor: "#ef4444" }}>
+        <div className="rounded-2xl border border-red-500/60 bg-red-500/10 p-4 text-sm">
           {localErr || tc.error || d.error}
         </div>
       )}
 
-      <div className="card">
-        <h2>Aufgaben</h2>
-        <small className="muted">
-          Aktiver Haushalt: <span className="badge">{d.activeHousehold.name}</span>
-        </small>
+      {/* Create */}
+      <div className="ui-card">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold">Aufgaben</h2>
+            <div className="mt-1 text-sm text-slate-400">
+              Aktiver Haushalt: <Pill>{d.activeHousehold.name}</Pill>
+            </div>
+          </div>
+        </div>
 
-        <hr />
+        <hr className="my-4 border-slate-800" />
 
-        <h3>Neue Aufgabe</h3>
+        <h3 className="ui-section-title">Neue Aufgabe</h3>
 
-        <div className="row">
+        <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+          <input className="ui-input" placeholder="Titel" value={taskTitle} onChange={(e) => setTaskTitle(e.target.value)} />
           <input
-            className="col"
-            placeholder="Titel"
-            value={taskTitle}
-            onChange={(e) => setTaskTitle(e.target.value)}
-          />
-
-          <input
-            className="col"
+            className="ui-input"
             type="datetime-local"
             value={taskDueAt}
             onChange={(e) => {
@@ -150,24 +243,8 @@ export function TasksPage() {
           />
         </div>
 
-        {recType !== "NONE" && startInPast && (
-          <div
-            className="card"
-            style={{
-              marginTop: 10,
-              borderColor: "#f59e0b",
-              background: "#0b1220"
-            }}
-          >
-            <small className="muted">
-              Hinweis: Der Start der Serie liegt in der Vergangenheit. Das ist erlaubt, kann aber verwirrend sein, wenn du
-              eigentlich „ab jetzt“ starten wolltest.
-            </small>
-          </div>
-        )}
-
-        <div className="row" style={{ marginTop: 10 }}>
-          <select className="col" value={assignedToId} onChange={(e) => setAssignedToId(e.target.value)}>
+        <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+          <select className="ui-select" value={assignedToId} onChange={(e) => setAssignedToId(e.target.value)}>
             <option value="">— Zuweisung —</option>
             {(d.members || []).map((m) => (
               <option key={m.user.id} value={m.user.id}>
@@ -176,7 +253,7 @@ export function TasksPage() {
             ))}
           </select>
 
-          <select className="col" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
+          <select className="ui-select" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
             <option value="">— Kategorie —</option>
             {(d.categories || []).map((c) => (
               <option key={c.id} value={c.id}>
@@ -186,17 +263,27 @@ export function TasksPage() {
           </select>
         </div>
 
-        <div className="card" style={{ marginTop: 12 }}>
-          <h3 style={{ marginBottom: 8 }}>Wiederholung</h3>
+        {/* Recurrence */}
+        <div className="mt-4 ui-card-subtle">
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="ui-section-title">Wiederholung</h3>
+            {recType !== "NONE" && <Pill>{startInPast ? "Start in Vergangenheit" : "Serie aktiv"}</Pill>}
+          </div>
 
-          <div className="row">
+          {startInPast && (
+            <div className="mt-3 rounded-2xl border border-amber-500/50 bg-amber-500/10 p-3 text-sm text-slate-200">
+              Hinweis: Der Start der Serie liegt in der Vergangenheit. Das ist erlaubt, kann aber verwirrend sein, wenn du
+              eigentlich „ab jetzt“ starten wolltest.
+            </div>
+          )}
+
+          <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-4">
             <select
-              className="col"
+              className="ui-select"
               value={recType}
               onChange={(e) => {
                 const next = e.target.value;
                 setRecType(next);
-
                 if (next === "NONE") {
                   setRecEndEnabled(false);
                   setRecEndDate("");
@@ -211,34 +298,30 @@ export function TasksPage() {
             </select>
 
             <input
-              style={{ width: 140 }}
+              className="ui-input"
               type="number"
               min={1}
               max={365}
               value={recInterval}
               onChange={(e) => setRecInterval(Math.max(1, Number(e.target.value || 1)))}
+              placeholder="Intervall"
+              title="Intervall"
             />
 
-            {recType === "CUSTOM" && (
-              <select style={{ width: 170 }} value={recUnit} onChange={(e) => setRecUnit(e.target.value)}>
+            {recType === "CUSTOM" ? (
+              <select className="ui-select" value={recUnit} onChange={(e) => setRecUnit(e.target.value)}>
                 <option value="DAY">Tag(e)</option>
                 <option value="WEEK">Woche(n)</option>
                 <option value="MONTH">Monat(e)</option>
               </select>
+            ) : (
+              <div className="hidden lg:block" />
             )}
 
-            <label
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                padding: "8px 10px",
-                border: "1px solid #243047",
-                borderRadius: 10,
-                background: "#0b1220"
-              }}
-            >
+            <label className="flex items-center justify-between gap-3 rounded-2xl border border-slate-800 bg-slate-950/30 px-3 py-2">
+              <span className="text-sm text-slate-200">Ende setzen</span>
               <input
+                className="ui-checkbox"
                 type="checkbox"
                 checked={recEndEnabled}
                 disabled={recType === "NONE"}
@@ -248,32 +331,28 @@ export function TasksPage() {
                   if (!on) setRecEndDate("");
                 }}
               />
-              <span>Ende setzen</span>
             </label>
-
-            {recEndEnabled && recType !== "NONE" && (
-              <input
-                style={{ width: 170 }}
-                type="date"
-                value={recEndDate}
-                onChange={(e) => setRecEndDate(e.target.value)}
-                title="Optionales Enddatum (inklusive)"
-              />
-            )}
           </div>
 
-          {(recType === "WEEKLY" || (recType === "CUSTOM" && recUnit === "WEEK")) && (
-            <div className="weekdayPicker" style={{ marginTop: 10 }}>
-              <small className="muted" style={{ display: "block", marginBottom: 6 }}>
-                Wochentage (optional; wenn leer → Start-Wochentag)
-              </small>
+          {recEndEnabled && recType !== "NONE" && (
+            <div className="mt-3">
+              <input className="ui-input max-w-xs" type="date" value={recEndDate} onChange={(e) => setRecEndDate(e.target.value)} />
+            </div>
+          )}
 
-              <div className="weekdayRow">
+          {(recType === "WEEKLY" || (recType === "CUSTOM" && recUnit === "WEEK")) && (
+            <div className="mt-4">
+              <div className="ui-muted">Wochentage (optional; wenn leer → Start-Wochentag)</div>
+              <div className="mt-2 flex flex-wrap gap-2">
                 {WEEKDAY_LABELS.map((lab, idx) => {
                   const checked = recWeekdays.includes(idx);
                   return (
-                    <label key={lab} className={"weekdayChip " + (checked ? "on" : "")}>
+                    <label
+                      key={lab}
+                      className={checked ? "ui-chip-on cursor-pointer select-none flex items-center gap-2" : "ui-chip-off cursor-pointer select-none flex items-center gap-2"}
+                    >
                       <input
+                        className="ui-checkbox"
                         type="checkbox"
                         checked={checked}
                         onChange={(e) => {
@@ -295,12 +374,10 @@ export function TasksPage() {
           )}
 
           {(recType === "MONTHLY" || (recType === "CUSTOM" && recUnit === "MONTH")) && (
-            <div style={{ marginTop: 10 }}>
-              <small className="muted" style={{ display: "block", marginBottom: 6 }}>
-                Tag im Monat (optional; Standard = Datum der ersten Aufgabe)
-              </small>
+            <div className="mt-4">
+              <div className="ui-muted">Tag im Monat (optional; Standard = Datum der ersten Aufgabe)</div>
               <input
-                style={{ width: 160 }}
+                className="ui-input mt-2 max-w-xs"
                 type="number"
                 min={1}
                 max={31}
@@ -309,18 +386,11 @@ export function TasksPage() {
               />
             </div>
           )}
-
-          {recType !== "NONE" && (
-            <small className="muted" style={{ display: "block", marginTop: 10 }}>
-              Vorschau: {recurringHint}
-              {recEndEnabled && recEndDate ? ` · Ende: ${new Date(recEndDate).toLocaleDateString()}` : " · Ohne Ende"}
-            </small>
-          )}
         </div>
 
-        <div className="row" style={{ marginTop: 10 }}>
+        <div className="mt-4">
           <button
-            className="primary"
+            className="ui-btn-primary"
             type="button"
             disabled={!taskTitle.trim() || tc.loading}
             onClick={async () => {
@@ -369,18 +439,122 @@ export function TasksPage() {
         </div>
       </div>
 
-      <div className="card">
-        <h3>Vorschau (nächste 45 Tage)</h3>
-        <small className="muted">
-          Wiederholungen werden als Serie gruppiert angezeigt. Status bei wiederkehrenden Aufgaben gilt pro Termin.
-        </small>
+      {/* List + Filter */}
+      <div className="ui-card">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h3 className="ui-section-title">Aufgaben</h3>
+            <div className="ui-muted">Zeitraum: {rangeLabel}</div>
+          </div>
 
-        <hr />
+          <div className="flex flex-wrap items-center gap-2">
+            <SegBtn active={preset === "STANDARD"} onClick={() => applyPreset("STANDARD")} title="Letzte 7 bis nächste 30">
+              Standard
+            </SegBtn>
+            <SegBtn active={preset === "NEXT7"} onClick={() => applyPreset("NEXT7")}>7</SegBtn>
+            <SegBtn active={preset === "NEXT30"} onClick={() => applyPreset("NEXT30")}>30</SegBtn>
+            <SegBtn active={preset === "NEXT90"} onClick={() => applyPreset("NEXT90")}>90</SegBtn>
+            <SegBtn active={preset === "CUSTOM"} onClick={() => applyPreset("CUSTOM")}>Custom</SegBtn>
+
+            <span className="mx-1 hidden sm:inline-block h-6 w-px bg-slate-800" />
+
+            <SegBtn active={statusFilter === "ALL"} onClick={() => setStatusFilter("ALL")}>Alle</SegBtn>
+            <SegBtn active={statusFilter === "OPEN"} onClick={() => setStatusFilter("OPEN")}>Offen</SegBtn>
+            <SegBtn active={statusFilter === "DONE"} onClick={() => setStatusFilter("DONE")}>Erledigt</SegBtn>
+
+            <span className="mx-1 hidden sm:inline-block h-6 w-px bg-slate-800" />
+
+            <SegBtn active={grouped} onClick={() => setGrouped((p) => !p)} title="Serien gruppieren">
+              {grouped ? "Gruppiert" : "Ungruppiert"}
+            </SegBtn>
+            <SegBtn active={showAdvanced} onClick={() => setShowAdvanced((p) => !p)}>
+              {showAdvanced ? "Weniger" : "Erweitert"}
+            </SegBtn>
+          </div>
+        </div>
+
+        {(showAdvanced || preset === "CUSTOM") && (
+          <>
+            <hr className="my-4 border-slate-800" />
+
+            {rangeWarning && (
+              <div className="mb-3 rounded-2xl border border-amber-500/50 bg-amber-500/10 p-3 text-sm">
+                {rangeWarning}
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+              <div>
+                <div className="ui-muted">Von</div>
+                <input
+                  className="ui-input mt-1"
+                  type="date"
+                  value={rangeFrom}
+                  onChange={(e) => {
+                    setPreset("CUSTOM");
+                    setRangeFrom(e.target.value);
+                  }}
+                />
+              </div>
+
+              <div>
+                <div className="ui-muted">Bis</div>
+                <input
+                  className="ui-input mt-1"
+                  type="date"
+                  value={rangeTo}
+                  onChange={(e) => {
+                    setPreset("CUSTOM");
+                    setRangeTo(e.target.value);
+                  }}
+                />
+              </div>
+
+              <div className="flex flex-wrap items-end gap-2">
+                <button
+                  type="button"
+                  className="ui-btn"
+                  onClick={() => {
+                    setPreset("CUSTOM");
+                    setRangeFrom(toDateValue(addDays(new Date(), 0)));
+                    setRangeTo(toDateValue(addDays(new Date(), 7)));
+                  }}
+                >
+                  Ab heute +7
+                </button>
+                <button
+                  type="button"
+                  className="ui-btn"
+                  onClick={() => {
+                    setPreset("CUSTOM");
+                    setRangeFrom(toDateValue(addDays(new Date(), 0)));
+                    setRangeTo(toDateValue(addDays(new Date(), 30)));
+                  }}
+                >
+                  Ab heute +30
+                </button>
+                <button
+                  type="button"
+                  className="ui-btn"
+                  onClick={() => {
+                    setPreset("CUSTOM");
+                    setRangeFrom(toDateValue(addDays(new Date(), -30)));
+                    setRangeTo(toDateValue(addDays(new Date(), 0)));
+                  }}
+                >
+                  Letzte 30
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+
+        <hr className="my-4 border-slate-800" />
 
         {tc.loading ? (
-          <small className="muted">Lade…</small>
-        ) : (
-          <div style={{ display: "grid", gap: 10 }}>
+          <div className="ui-muted">Lade…</div>
+        ) : grouped ? (
+          <div className="space-y-3">
             {seriesGroups.map((g) => {
               const recurring = isRecurringTask(g.task);
               const label = describeRecurrence(g.task);
@@ -388,90 +562,126 @@ export function TasksPage() {
               const startAt = g.task.dueAt ? new Date(g.task.dueAt) : null;
 
               return (
-                <details key={g.task.id} className="task" style={{ padding: 0, overflow: "hidden" }}>
-                  <summary
-                    style={{
-                      listStyle: "none",
-                      cursor: "pointer",
-                      padding: 10,
-                      display: "flex",
-                      justifyContent: "space-between",
-                      gap: 12,
-                      alignItems: "flex-start"
-                    }}
-                  >
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontWeight: 600, wordBreak: "break-word" }}>
-                        {g.task.title}
-                        <span className="badge" style={{ marginLeft: 8 }}>
-                          {recurring ? "Serie" : "Einzeln"}
-                        </span>
+                <details key={g.task.id} className="rounded-2xl border border-slate-800 bg-slate-950/30">
+                  <summary className="cursor-pointer list-none px-4 py-3">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <div className="font-semibold break-words">{g.task.title}</div>
+                          <Pill>{recurring ? "Serie" : "Einzeln"}</Pill>
+                        </div>
+
+                        <div className="mt-1 text-sm text-slate-400 break-words">
+                          {label}
+                          {startAt ? ` · Start: ${startAt.toLocaleString()}` : ""}
+                          {recurring ? (endAt ? ` · Ende: ${endAt.toLocaleString()}` : " · Ohne Ende") : ""}
+                          {" · "}
+                          {g.task.assignedTo ? `Zuweisung: ${g.task.assignedTo.name}` : "Keine Zuweisung"}
+                          {" · "}
+                          {g.task.category ? `Kategorie: ${g.task.category.name}` : "Keine Kategorie"}
+                        </div>
                       </div>
-                      <small className="muted" style={{ wordBreak: "break-word" }}>
-                        {label}
-                        {startAt ? ` · Start: ${startAt.toLocaleString()}` : ""}
-                        {endAt ? ` · Ende: ${endAt.toLocaleString()}` : recurring ? " · Ohne Ende" : ""}
-                        {" · "}
-                        {g.task.assignedTo ? "Zuweisung: " + g.task.assignedTo.name : "Keine Zuweisung"}
-                        {" · "}
-                        {g.task.category ? "Kategorie: " + g.task.category.name : "Keine Kategorie"}
-                      </small>
-                    </div>
 
-                    <div style={{ display: "flex", gap: 8, alignItems: "flex-start", flexWrap: "wrap" }}>
-                      <span className="statusPill open" title="Offene Termine in diesem Zeitraum">
-                        Offen: {g.open}
-                      </span>
-                      <span className="statusPill done" title="Erledigte Termine in diesem Zeitraum">
-                        Done: {g.done}
-                      </span>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Pill tone="open">Offen: {g.open}</Pill>
+                        <Pill tone="done">Done: {g.done}</Pill>
 
-                      <button
-                        className="danger"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          tc.deleteTask(g.task.id);
-                        }}
-                      >
-                        {recurring ? "Serie löschen" : "Aufgabe löschen"}
-                      </button>
+                        {/* Tailwind delete */}
+                        <button
+                          type="button"
+                          className="ui-btn-danger"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            tc.deleteTask(g.task.id);
+                          }}
+                        >
+                          {recurring ? "Serie löschen" : "Aufgabe löschen"}
+                        </button>
+                      </div>
                     </div>
                   </summary>
 
-                  <div style={{ display: "grid", gap: 10, padding: 10, borderTop: "1px solid #1f2937" }}>
+                  <div className="border-t border-slate-800 px-4 py-3 space-y-2">
                     {(g.occurrences || []).map((o) => (
-                      <div key={o.key} className={"task " + (o.status === "DONE" ? "done" : "")}>
-                        <div style={{ minWidth: 0 }}>
-                          <div style={{ fontWeight: 600, wordBreak: "break-word" }}>
-                            {new Date(o.dueAt).toLocaleString()}
-                          </div>
-                          <small className="muted" style={{ wordBreak: "break-word" }}>
-                            {o.assignedTo ? "Zuweisung: " + o.assignedTo.name : "Keine Zuweisung"}
+                      <div
+                        key={o.key}
+                        className={[
+                          "flex flex-wrap items-start justify-between gap-3 rounded-2xl border px-3 py-3",
+                          o.status === "DONE" ? "border-slate-800 bg-slate-950/20 opacity-70" : "border-slate-800 bg-slate-950/30"
+                        ].join(" ")}
+                      >
+                        <div className="min-w-0">
+                          <div className="font-medium break-words">{new Date(o.dueAt).toLocaleString()}</div>
+                          <div className="mt-1 text-sm text-slate-400 break-words">
+                            {o.assignedTo ? `Zuweisung: ${o.assignedTo.name}` : "Keine Zuweisung"}
                             {" · "}
-                            {o.category ? "Kategorie: " + o.category.name : "Keine Kategorie"}
-                          </small>
+                            {o.category ? `Kategorie: ${o.category.name}` : "Keine Kategorie"}
+                          </div>
                         </div>
 
-                        <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-                          <span className={"statusPill " + (o.status === "DONE" ? "done" : "open")}>
+                        <div className="flex items-center gap-2">
+                          <Pill tone={o.status === "DONE" ? "done" : "open"}>
                             {o.status === "DONE" ? "Erledigt" : "Offen"}
-                          </span>
-
-                          <button onClick={() => tc.toggleOccurrence(o)}>
+                          </Pill>
+                          <button type="button" className="ui-btn" onClick={() => tc.toggleOccurrence(o)}>
                             {o.status === "DONE" ? "Reopen" : "Done"}
                           </button>
                         </div>
                       </div>
                     ))}
 
-                    {(g.occurrences || []).length === 0 && <small className="muted">Keine Termine im Zeitraum.</small>}
+                    {(g.occurrences || []).length === 0 && (
+                      <div className="ui-muted">Keine Termine im Zeitraum (oder durch Filter ausgeblendet).</div>
+                    )}
                   </div>
                 </details>
               );
             })}
 
-            {seriesGroups.length === 0 && <small className="muted">Noch keine Aufgaben in diesem Zeitraum.</small>}
+            {seriesGroups.length === 0 && <div className="ui-muted">Keine Aufgaben im gewählten Zeitraum.</div>}
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {flatOccurrences.map((o) => {
+              const recurring = isRecurringTask(o.baseTask);
+              return (
+                <div
+                  key={o.key}
+                  className={[
+                    "flex flex-wrap items-start justify-between gap-3 rounded-2xl border px-4 py-3",
+                    o.status === "DONE" ? "border-slate-800 bg-slate-950/20 opacity-70" : "border-slate-800 bg-slate-950/30"
+                  ].join(" ")}
+                >
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="font-semibold break-words">{o.title}</div>
+                      {recurring && <Pill>Serie</Pill>}
+                    </div>
+                    <div className="mt-1 text-sm text-slate-400 break-words">
+                      Fällig: {new Date(o.dueAt).toLocaleString()}
+                      {" · "}
+                      {o.assignedTo ? `Zuweisung: ${o.assignedTo.name}` : "Keine Zuweisung"}
+                      {" · "}
+                      {o.category ? `Kategorie: ${o.category.name}` : "Keine Kategorie"}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Pill tone={o.status === "DONE" ? "done" : "open"}>{o.status === "DONE" ? "Erledigt" : "Offen"}</Pill>
+                    <button type="button" className="ui-btn" onClick={() => tc.toggleOccurrence(o)}>
+                      {o.status === "DONE" ? "Reopen" : "Done"}
+                    </button>
+                    {/* Tailwind delete (auch in ungrouped sichtbar) */}
+                    <button type="button" className="ui-btn-danger" onClick={() => tc.deleteTask(o.taskId)}>
+                      {recurring ? "Serie löschen" : "Aufgabe löschen"}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+
+            {flatOccurrences.length === 0 && <div className="ui-muted">Keine Aufgaben im gewählten Zeitraum.</div>}
           </div>
         )}
       </div>

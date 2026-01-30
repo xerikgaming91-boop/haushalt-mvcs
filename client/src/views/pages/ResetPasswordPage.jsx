@@ -36,46 +36,62 @@ export function ResetPasswordPage() {
       setMsg("Passwort wurde geändert. Du wirst zum Login weitergeleitet.");
       setNewPassword("");
       setConfirm("");
-      setTimeout(() => navigate("/login"), 700);
+      setTimeout(() => navigate("/login"), 800);
     } catch (e2) {
       setErr(e2.message);
     }
   }
 
   return (
-    <div className="card" style={{ maxWidth: 620 }}>
-      <h2>Passwort zurücksetzen</h2>
-      <small className="muted">
-        Token: {token ? token.slice(0, 10) + "..." : "(fehlt)"}{" "}
-      </small>
+    <div className="mx-auto max-w-lg">
+      <h2 className="text-lg font-semibold">Passwort zurücksetzen</h2>
+      <p className="mt-1 text-sm text-slate-400">Token: {token ? token.slice(0, 10) + "…" : "(fehlt)"}</p>
 
-      <hr />
+      {err && (
+        <div className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-100">
+          {err}
+        </div>
+      )}
+      {msg && (
+        <div className="mt-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
+          {msg}
+        </div>
+      )}
 
-      {err && <div className="badge" style={{ borderColor: "#ef4444" }}>{err}</div>}
-      {msg && <div className="badge" style={{ borderColor: "#22c55e" }}>{msg}</div>}
+      <form onSubmit={submit} className="mt-4 space-y-3">
+        <div>
+          <label className="text-xs font-medium text-slate-300">Neues Passwort</label>
+          <input
+            className="mt-1 w-full rounded-xl border border-slate-800 bg-slate-950/40 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-blue-500/70 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+            type="password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+          />
+        </div>
 
-      <form onSubmit={submit} className="row">
-        <input
-          className="col"
-          placeholder="Neues Passwort"
-          type="password"
-          value={newPassword}
-          onChange={(e) => setNewPassword(e.target.value)}
-        />
-        <input
-          className="col"
-          placeholder="Neues Passwort bestätigen"
-          type="password"
-          value={confirm}
-          onChange={(e) => setConfirm(e.target.value)}
-        />
-        <button className="primary" type="submit">Passwort speichern</button>
+        <div>
+          <label className="text-xs font-medium text-slate-300">Passwort bestätigen</label>
+          <input
+            className="mt-1 w-full rounded-xl border border-slate-800 bg-slate-950/40 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-blue-500/70 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+            type="password"
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+          />
+        </div>
+
+        <button
+          className="w-full rounded-xl border border-blue-600 bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500"
+          type="submit"
+        >
+          Passwort speichern
+        </button>
       </form>
 
-      <hr />
-      <small className="muted">
-        <Link to="/login">Zurück zum Login</Link>
-      </small>
+      <div className="mt-4 text-sm">
+        <Link to="/login" className="text-blue-300 hover:text-blue-200">
+          Zurück zum Login
+        </Link>
+      </div>
     </div>
   );
 }

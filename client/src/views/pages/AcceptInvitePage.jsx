@@ -9,7 +9,8 @@ export function AcceptInvitePage({ auth }) {
   const navigate = useNavigate();
 
   async function accept() {
-    setErr(""); setMsg("");
+    setErr("");
+    setMsg("");
     try {
       const result = await auth.acceptInviteIfPossible(token);
       if (result.requiresLogin) {
@@ -19,20 +20,36 @@ export function AcceptInvitePage({ auth }) {
         return;
       }
       setMsg("Einladung angenommen. Weiter zum Dashboard.");
-      setTimeout(() => navigate("/"), 600);
+      setTimeout(() => navigate("/"), 700);
     } catch (e) {
       setErr(e.message);
     }
   }
 
   return (
-    <div className="card" style={{ maxWidth: 720 }}>
-      <h2>Einladung annehmen</h2>
-      <small className="muted">Token: {token ? token.slice(0, 10) + "..." : "(fehlt)"}</small>
-      <hr />
-      {err && <div className="badge" style={{ borderColor: "#ef4444" }}>{err}</div>}
-      {msg && <div className="badge" style={{ borderColor: "#22c55e" }}>{msg}</div>}
-      <button className="primary" onClick={accept}>Einladung annehmen</button>
+    <div className="mx-auto max-w-lg">
+      <h2 className="text-lg font-semibold">Einladung annehmen</h2>
+      <p className="mt-1 text-sm text-slate-400">Token: {token ? token.slice(0, 10) + "…" : "(fehlt)"}</p>
+
+      {err && (
+        <div className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-100">
+          {err}
+        </div>
+      )}
+      {msg && (
+        <div className="mt-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
+          {msg}
+        </div>
+      )}
+
+      <button
+        type="button"
+        onClick={accept}
+        className="mt-4 w-full rounded-xl border border-blue-600 bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-60"
+        disabled={!token}
+      >
+        Einladung annehmen
+      </button>
     </div>
   );
 }

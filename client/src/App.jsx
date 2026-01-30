@@ -15,6 +15,12 @@ import { CalendarPage } from "./views/pages/CalendarPage.jsx";
 import { HouseholdPage } from "./views/pages/HouseholdPage.jsx";
 import { CategoriesPage } from "./views/pages/CategoriesPage.jsx";
 import { ShoppingPage } from "./views/pages/ShoppingPage.jsx";
+import { SettingsPage } from "./views/pages/SettingsPage.jsx";
+
+// Optional: nur wenn du die Page bereits hast.
+// Wenn der Import bei dir knallt, kommentiere diese beiden Zeilen aus
+// und sag mir den tatsächlichen Pfad/Dateinamen.
+import { NotificationsPage } from "./views/pages/NotificationsPage.jsx";
 
 function PublicLayout({ auth }) {
   const navigate = useNavigate();
@@ -75,6 +81,9 @@ export default function App() {
         <Route path="shopping" element={<ShoppingPage />} />
         <Route path="household" element={<HouseholdPage />} />
         <Route path="categories" element={<CategoriesPage />} />
+
+        <Route path="notifications" element={<NotificationsPage />} />
+        <Route path="settings" element={<SettingsPage />} />
       </Route>
 
       {/* Fallback */}

@@ -4,10 +4,17 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./App.jsx";
 import "./styles.css";
 
+import { ToastProvider } from "./components/ToastProvider.jsx";
+import { ConfirmProvider } from "./components/ConfirmProvider.jsx";
+
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <BrowserRouter>
-      <App />
-    </BrowserRouter>
+    <ToastProvider>
+      <ConfirmProvider>
+        <BrowserRouter>
+          <App />
+        </BrowserRouter>
+      </ConfirmProvider>
+    </ToastProvider>
   </React.StrictMode>
 );
