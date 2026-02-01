@@ -1,22 +1,24 @@
 {
-  "name": "haushalt-server",
+  "name": "haushalt-mvcs",
   "version": "1.0.0",
   "type": "module",
   "private": true,
+  "workspaces": [
+    "client"
+  ],
   "scripts": {
     "dev": "concurrently -n SERVER,CLIENT -c auto \"npm run dev:server\" \"npm run dev:client\"",
-    "dev:server": "nodemon src/server.js",
-    "dev:client": "npm --prefix client run dev",
+    "dev:server": "cd server && nodemon src/server.js",
+    "dev:client": "npm run -w client dev",
 
-    "build": "npm --prefix client install --include=dev && npm --prefix client run build",
-    "build:client": "npm --prefix client install --include=dev && npm --prefix client run build",
+    "start": "cd server && node src/server.js",
 
-    "start": "node src/server.js",
+    "build": "npm run -w client build",
+    "build:client": "npm run -w client build",
 
-    "migrate": "prisma migrate dev",
-    "studio": "prisma studio",
-
-    "postinstall": "npm --prefix client install --include=dev"
+    "generate": "cd server && prisma generate",
+    "db:push": "cd server && prisma db push",
+    "studio": "cd server && prisma studio"
   },
   "dependencies": {
     "@prisma/client": "^6.0.0",
@@ -29,7 +31,7 @@
   },
   "devDependencies": {
     "concurrently": "^9.0.1",
-    "nodemon": "^3.1.4",
+    "nodemon": "^3.1.11",
     "prisma": "^6.0.0"
   }
 }

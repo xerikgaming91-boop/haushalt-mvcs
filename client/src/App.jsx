@@ -16,6 +16,9 @@ import { HouseholdPage } from "./views/pages/HouseholdPage.jsx";
 import { CategoriesPage } from "./views/pages/CategoriesPage.jsx";
 import { ShoppingPage } from "./views/pages/ShoppingPage.jsx";
 
+// ✅ WICHTIG: DashboardProvider um die Authed-Routes legen
+import { DashboardProvider } from "./controllers/DashboardContext.jsx";
+
 function PublicLayout({ auth }) {
   const navigate = useNavigate();
 
@@ -53,6 +56,14 @@ function PublicLayout({ auth }) {
   );
 }
 
+function AuthedRoot({ auth }) {
+  return (
+    <DashboardProvider>
+      <AuthedLayout auth={auth} />
+    </DashboardProvider>
+  );
+}
+
 export default function App() {
   const auth = useAuthController();
 
@@ -68,7 +79,7 @@ export default function App() {
       </Route>
 
       {/* Authed routes */}
-      <Route path="/" element={<AuthedLayout auth={auth} />}>
+      <Route path="/" element={<AuthedRoot auth={auth} />}>
         <Route index element={<DashboardPage />} />
         <Route path="tasks" element={<TasksPage />} />
         <Route path="calendar" element={<CalendarPage />} />
