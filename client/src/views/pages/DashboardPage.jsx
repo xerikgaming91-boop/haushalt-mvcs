@@ -1,6 +1,35 @@
 import React, { useMemo } from "react";
 import { Link } from "react-router-dom";
+import {
+  CalendarDaysIcon,
+  ClipboardDocumentListIcon,
+  ShoppingCartIcon,
+  UsersIcon,
+  TagIcon,
+  ChevronRightIcon,
+} from "@heroicons/react/24/outline";
 import { useDashboard } from "../../controllers/DashboardContext.jsx";
+
+function StatCard({ icon: Icon, label, value, to }) {
+  return (
+    <Link
+      to={to}
+      className="group rounded-2xl border border-white/10 bg-slate-900/60 p-5 shadow-sm hover:bg-white/5"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="grid h-10 w-10 place-items-center rounded-xl bg-white/5 text-slate-200">
+          <Icon className="h-6 w-6" />
+        </div>
+        <ChevronRightIcon className="h-5 w-5 text-slate-500 opacity-0 transition group-hover:opacity-100" />
+      </div>
+
+      <div className="mt-4">
+        <p className="text-xs font-semibold text-slate-400">{label}</p>
+        <p className="mt-1 text-2xl font-semibold text-white">{value}</p>
+      </div>
+    </Link>
+  );
+}
 
 export function DashboardPage() {
   const d = useDashboard();
@@ -9,98 +38,74 @@ export function DashboardPage() {
     const tasks = d.tasks || [];
     const open = tasks.filter((t) => t.status === "OPEN").length;
     const done = tasks.filter((t) => t.status === "DONE").length;
-
-    const now = Date.now();
-    const upcoming = tasks
-      .filter((t) => new Date(t.dueAt).getTime() >= now)
-      .sort((a, b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime())
-      .slice(0, 5);
-
-    return { open, done, upcoming };
+    return { open, done, total: tasks.length };
   }, [d.tasks]);
 
   if (!d.activeHousehold) {
     return (
-      <div className="card">
-        <h2>Übersicht</h2>
-        <small className="muted">
-          Du hast noch keinen Haushalt ausgewählt/angelegt. Bitte gehe zu{" "}
-          <Link to="/household">Haushalt</Link>.
-        </small>
+      <div className="tw-card">
+        <h2 className="text-lg font-semibold text-white">Dashboard</h2>
+        <p className="mt-2 text-sm text-slate-400">
+          Bitte zuerst einen Haushalt auswählen/erstellen unter{" "}
+          <Link className="text-sky-300 hover:text-sky-200" to="/household">
+            Haushalt
+          </Link>
+          .
+        </p>
       </div>
     );
   }
 
   return (
-    <div style={{ display: "grid", gap: 12 }}>
-      {d.error && (
-        <div className="card" style={{ borderColor: "#ef4444" }}>
-          {d.error}
-        </div>
-      )}
-
-      <div className="card">
-        <h2>Übersicht</h2>
-        <small className="muted">
-          Aktiver Haushalt: <span className="badge">{d.activeHousehold.name}</span>
-        </small>
-
-        <hr />
-
-        <div className="row">
-          <div className="col card">
-            <h3>Offen</h3>
-            <div style={{ fontSize: 28, fontWeight: 700 }}>{stats.open}</div>
-            <small className="muted">
-              <Link to="/tasks">Zu den Aufgaben</Link>
-            </small>
-          </div>
-
-          <div className="col card">
-            <h3>Erledigt</h3>
-            <div style={{ fontSize: 28, fontWeight: 700 }}>{stats.done}</div>
-            <small className="muted">
-              <Link to="/tasks">Aufgaben ansehen</Link>
-            </small>
-          </div>
-
-          <div className="col card">
-            <h3>Kalender</h3>
-            <div style={{ fontSize: 28, fontWeight: 700 }}>↗</div>
-            <small className="muted">
-              <Link to="/calendar">Zum Kalender</Link>
-            </small>
-          </div>
-        </div>
+    <div className="space-y-6">
+      <div className="tw-card">
+        <h2 className="text-lg font-semibold text-white">Dashboard</h2>
+        <p className="mt-1 text-sm text-slate-400">
+          Aktiver Haushalt: <span className="tw-pill tw-pill-muted">{d.activeHousehold.name}</span>
+        </p>
       </div>
 
-      <div className="card">
-        <h2>Nächste Aufgaben</h2>
-        <small className="muted">Die nächsten 5 fälligen Aufgaben (ab jetzt).</small>
-
-        <hr />
-
-        <div style={{ display: "grid", gap: 10 }}>
-          {stats.upcoming.map((t) => (
-            <div key={t.id} className={"task " + (t.status === "DONE" ? "done" : "")}>
-              <div>
-                <div style={{ fontWeight: 600 }}>{t.title}</div>
-                <small className="muted">
-                  Fällig: {new Date(t.dueAt).toLocaleString()}
-                  {" · "}
-                  {t.assignedTo ? "Zuweisung: " + t.assignedTo.name : "Keine Zuweisung"}
-                  {" · "}
-                  {t.category ? "Kategorie: " + t.category.name : "Keine Kategorie"}
-                </small>
-              </div>
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {/* Kalender-Kachel: Icon statt Pfeil */}
+        <Link
+          to="/calendar"
+          className="group rounded-2xl border border-white/10 bg-slate-900/60 p-5 shadow-sm hover:bg-white/5"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="grid h-10 w-10 place-items-center rounded-xl bg-white/5 text-slate-200">
+              <CalendarDaysIcon className="h-6 w-6" />
             </div>
-          ))}
-          {stats.upcoming.length === 0 && <small className="muted">Keine anstehenden Aufgaben.</small>}
+            <CalendarDaysIcon className="h-5 w-5 text-slate-400" />
+          </div>
+
+          <div className="mt-4">
+            <p className="text-xs font-semibold text-slate-400">Kalender</p>
+            <p className="mt-1 text-sm text-slate-200">Übersicht aller Termine</p>
+          </div>
+        </Link>
+
+        <StatCard icon={ClipboardDocumentListIcon} label="Offene Aufgaben" value={stats.open} to="/tasks" />
+        <StatCard icon={ShoppingCartIcon} label="Einkauf" value="→" to="/shopping" />
+        <StatCard icon={UsersIcon} label="Mitglieder" value={(d.members || []).length} to="/household" />
+        <StatCard icon={TagIcon} label="Kategorien" value={(d.categories || []).length} to="/categories" />
+      </div>
+
+      <div className="tw-card">
+        <h3 className="text-sm font-semibold text-white">Kurzinfo</h3>
+        <div className="mt-3 grid gap-3 sm:grid-cols-3">
+          <div className="tw-card-soft">
+            <p className="text-xs font-semibold text-slate-400">Aufgaben total</p>
+            <p className="mt-1 text-xl font-semibold text-white">{stats.total}</p>
+          </div>
+          <div className="tw-card-soft">
+            <p className="text-xs font-semibold text-slate-400">Erledigt</p>
+            <p className="mt-1 text-xl font-semibold text-white">{stats.done}</p>
+          </div>
+          <div className="tw-card-soft">
+            <p className="text-xs font-semibold text-slate-400">Offen</p>
+            <p className="mt-1 text-xl font-semibold text-white">{stats.open}</p>
+          </div>
         </div>
-
-        <hr />
-
-        <Link to="/tasks">Aufgaben verwalten</Link>
       </div>
     </div>
   );

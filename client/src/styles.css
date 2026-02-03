@@ -21,18 +21,100 @@
   }
 }
 
-/* ---------- Legacy helpers (damit alte Pages nicht kaputt gehen) ---------- */
+/* ---------- UI Primitives ---------- */
+@layer components {
+  /* ✅ w-full sorgt dafür, dass Cards nicht shrink-to-content wirken */
+  .tw-card {
+    @apply w-full rounded-2xl border border-white/10 bg-slate-900/60 p-6 shadow-sm;
+  }
+
+  .tw-card-soft {
+    @apply w-full rounded-2xl border border-white/10 bg-slate-950/40 p-4;
+  }
+
+  .tw-label {
+    @apply block text-xs font-semibold text-slate-300;
+  }
+
+  .tw-help {
+    @apply text-xs text-slate-400;
+  }
+
+  .tw-input,
+  .tw-select,
+  .tw-textarea {
+    @apply block w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm text-white placeholder:text-slate-500 outline-none;
+    @apply focus:border-sky-500/60 focus:ring-2 focus:ring-sky-500/20;
+  }
+
+  .tw-textarea {
+    @apply min-h-[90px];
+  }
+
+  .tw-checkbox {
+    @apply h-4 w-4 rounded border-white/20 bg-slate-900/60 text-sky-500;
+    @apply focus:ring-2 focus:ring-sky-500/20 focus:ring-offset-0;
+  }
+
+  .tw-btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm font-semibold text-slate-100;
+    @apply hover:bg-white/5 disabled:opacity-60 disabled:cursor-not-allowed;
+  }
+
+  .tw-btn-primary {
+    @apply border-sky-500/30 bg-sky-600/90 text-white hover:bg-sky-600;
+  }
+
+  .tw-btn-danger {
+    @apply border-rose-500/30 bg-rose-600/90 text-white hover:bg-rose-600;
+  }
+
+  .tw-btn-ghost {
+    @apply border-transparent bg-transparent hover:bg-white/5;
+  }
+
+  .tw-icon-btn {
+    @apply inline-flex items-center justify-center rounded-xl border border-white/10 bg-slate-900/60 p-2 text-slate-200 hover:bg-white/5;
+  }
+
+  .tw-pill {
+    @apply inline-flex items-center rounded-full border px-2 py-1 text-xs font-semibold;
+  }
+
+  .tw-pill-open {
+    @apply border-sky-500/30 bg-sky-500/10 text-sky-100;
+  }
+
+  .tw-pill-done {
+    @apply border-emerald-500/30 bg-emerald-500/10 text-emerald-100;
+  }
+
+  .tw-pill-muted {
+    @apply border-white/10 bg-white/5 text-slate-200;
+  }
+
+  .tw-divider {
+    @apply my-4 border-white/10;
+  }
+}
+
+/* ---------- Legacy helpers (auf Household-Werte gemappt) ---------- */
 @layer components {
   .container {
     @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
   }
 
+  /* ✅ Legacy card: gleiche Breite/Look wie Household */
   .card {
-    @apply rounded-xl border border-white/10 bg-slate-900/60 p-4 shadow-sm;
+    @apply w-full rounded-2xl border border-white/10 bg-slate-900/60 p-6 shadow-sm;
+  }
+
+  .card-soft {
+    @apply w-full rounded-2xl border border-white/10 bg-slate-950/40 p-4;
   }
 
   .row {
-    @apply flex flex-wrap gap-3;
+    @apply flex flex-wrap gap-4;
   }
 
   .col {
@@ -42,19 +124,24 @@
   input,
   select,
   textarea {
-    @apply w-full rounded-lg border border-white/10 bg-slate-900/60 px-3 py-2 text-slate-100 placeholder:text-slate-400 outline-none focus:border-sky-500/60 focus:ring-2 focus:ring-sky-500/20;
+    @apply w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-slate-100 placeholder:text-slate-400 outline-none;
+    @apply focus:border-sky-500/60 focus:ring-2 focus:ring-sky-500/20;
   }
 
   button {
-    @apply inline-flex items-center justify-center rounded-lg border border-white/10 bg-slate-900/60 px-3 py-2 text-sm font-semibold text-slate-100 hover:bg-slate-800/60;
+    @apply inline-flex items-center justify-center rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm font-semibold text-slate-100 hover:bg-white/5;
   }
 
   button.primary {
-    @apply border-sky-500/30 bg-sky-600/90 hover:bg-sky-600;
+    @apply border-sky-500/30 bg-sky-600/90 text-white hover:bg-sky-600;
   }
 
   button.danger {
-    @apply border-rose-500/30 bg-rose-600/90 hover:bg-rose-600;
+    @apply border-rose-500/30 bg-rose-600/90 text-white hover:bg-rose-600;
+  }
+
+  .badge {
+    @apply inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs font-semibold text-slate-200;
   }
 
   small.muted {

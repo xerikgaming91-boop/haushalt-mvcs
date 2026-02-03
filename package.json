@@ -1,37 +1,26 @@
 {
   "name": "haushalt-mvcs",
   "version": "1.0.0",
-  "type": "module",
   "private": true,
   "workspaces": [
-    "client"
+    "client",
+    "server"
   ],
   "scripts": {
-    "dev": "concurrently -n SERVER,CLIENT -c auto \"npm run dev:server\" \"npm run dev:client\"",
-    "dev:server": "cd server && nodemon src/server.js",
-    "dev:client": "npm run -w client dev",
+    "dev": "concurrently -n SERVER,CLIENT -c auto \"npm -w server run dev\" \"npm -w client run dev\"",
+    "dev:server": "npm -w server run dev",
+    "dev:client": "npm -w client run dev",
 
-    "start": "cd server && node src/server.js",
+    "start": "npm -w server run start",
 
-    "build": "npm run -w client build",
-    "build:client": "npm run -w client build",
+    "build": "npm -w client run build",
+    "preview": "npm -w client run preview",
 
-    "generate": "cd server && prisma generate",
-    "db:push": "cd server && prisma db push",
-    "studio": "cd server && prisma studio"
-  },
-  "dependencies": {
-    "@prisma/client": "^6.0.0",
-    "bcryptjs": "^2.4.3",
-    "cors": "^2.8.5",
-    "dotenv": "^16.4.5",
-    "express": "^4.19.2",
-    "jsonwebtoken": "^9.0.2",
-    "zod": "^3.23.8"
+    "prisma:generate": "npm -w server run prisma:generate",
+    "prisma:migrate": "npm -w server run prisma:migrate",
+    "prisma:studio": "npm -w server run prisma:studio"
   },
   "devDependencies": {
-    "concurrently": "^9.0.1",
-    "nodemon": "^3.1.11",
-    "prisma": "^6.0.0"
+    "concurrently": "^9.1.0"
   }
 }

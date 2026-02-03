@@ -8,6 +8,17 @@ CREATE TABLE "User" (
 );
 
 -- CreateTable
+CREATE TABLE "PasswordResetToken" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "tokenHash" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "expiresAt" DATETIME NOT NULL,
+    "usedAt" DATETIME,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "PasswordResetToken_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
 CREATE TABLE "Household" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "name" TEXT NOT NULL,
@@ -62,6 +73,12 @@ CREATE TABLE "Task" (
     "categoryId" TEXT,
     "assignedToId" TEXT,
     "createdById" TEXT NOT NULL,
+    "recurrenceType" TEXT NOT NULL DEFAULT 'NONE',
+    "recurrenceInterval" INTEGER NOT NULL DEFAULT 1,
+    "recurrenceUnit" TEXT,
+    "recurrenceByWeekday" JSONB,
+    "recurrenceByMonthday" INTEGER,
+    "recurrenceEndAt" DATETIME,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
     CONSTRAINT "Task_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "Category" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
@@ -70,8 +87,46 @@ CREATE TABLE "Task" (
     CONSTRAINT "Task_householdId_fkey" FOREIGN KEY ("householdId") REFERENCES "Household" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
+-- CreateTable
+CREATE TABLE "TaskOccurrence" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "taskId" TEXT NOT NULL,
+    "occurrenceAt" DATETIME NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'OPEN',
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "TaskOccurrence_taskId_fkey" FOREIGN KEY ("taskId") REFERENCES "Task" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "ShoppingItem" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "householdId" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "quantity" TEXT,
+    "note" TEXT,
+    "isPurchased" BOOLEAN NOT NULL DEFAULT false,
+    "purchasedAt" DATETIME,
+    "purchasedById" TEXT,
+    "createdById" TEXT NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "ShoppingItem_householdId_fkey" FOREIGN KEY ("householdId") REFERENCES "Household" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "ShoppingItem_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "ShoppingItem_purchasedById_fkey" FOREIGN KEY ("purchasedById") REFERENCES "User" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "PasswordResetToken_tokenHash_key" ON "PasswordResetToken"("tokenHash");
+
+-- CreateIndex
+CREATE INDEX "PasswordResetToken_userId_idx" ON "PasswordResetToken"("userId");
+
+-- CreateIndex
+CREATE INDEX "PasswordResetToken_expiresAt_idx" ON "PasswordResetToken"("expiresAt");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "HouseholdMember_householdId_userId_key" ON "HouseholdMember"("householdId", "userId");
@@ -90,3 +145,18 @@ CREATE INDEX "Task_assignedToId_idx" ON "Task"("assignedToId");
 
 -- CreateIndex
 CREATE INDEX "Task_categoryId_idx" ON "Task"("categoryId");
+
+-- CreateIndex
+CREATE INDEX "TaskOccurrence_occurrenceAt_idx" ON "TaskOccurrence"("occurrenceAt");
+
+-- CreateIndex
+CREATE INDEX "TaskOccurrence_taskId_idx" ON "TaskOccurrence"("taskId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "TaskOccurrence_taskId_occurrenceAt_key" ON "TaskOccurrence"("taskId", "occurrenceAt");
+
+-- CreateIndex
+CREATE INDEX "ShoppingItem_householdId_createdAt_idx" ON "ShoppingItem"("householdId", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "ShoppingItem_householdId_isPurchased_idx" ON "ShoppingItem"("householdId", "isPurchased");
