@@ -1,6 +1,5 @@
-// client/src/App.jsx
 import React from "react";
-import { Navigate, Outlet, Route, Routes, useNavigate } from "react-router-dom";
+import { Navigate, Outlet, Route, Routes } from "react-router-dom";
 import { useAuthController } from "./controllers/useAuthController.js";
 
 import { LoginPage } from "./views/pages/LoginPage.jsx";
@@ -10,56 +9,44 @@ import { ForgotPasswordPage } from "./views/pages/ForgotPasswordPage.jsx";
 import { ResetPasswordPage } from "./views/pages/ResetPasswordPage.jsx";
 
 import { AuthedLayout } from "./views/layouts/AuthedLayout.jsx";
+
 import { DashboardPage } from "./views/pages/DashboardPage.jsx";
 import { TasksPage } from "./views/pages/TasksPage.jsx";
 import { CalendarPage } from "./views/pages/CalendarPage.jsx";
+import { ShoppingPage } from "./views/pages/ShoppingPage.jsx";
+import { FinancesPage } from "./views/pages/FinancesPage.jsx";
 import { HouseholdPage } from "./views/pages/HouseholdPage.jsx";
 import { CategoriesPage } from "./views/pages/CategoriesPage.jsx";
-import { ShoppingPage } from "./views/pages/ShoppingPage.jsx";
+import { BackupPage } from "./views/pages/BackupPage.jsx";
 import { SettingsPage } from "./views/pages/SettingsPage.jsx";
-import { FinancesPage } from "./views/pages/FinancesPage.jsx";
 
 import { DashboardProvider } from "./controllers/DashboardContext.jsx";
+import { ROUTES } from "./app/routes.js";
 
 function PublicLayout({ auth }) {
-  const navigate = useNavigate();
-
   if (auth.loadingMe) {
     return (
-      <div className="container">
-        <div className="card">Lade…</div>
+      <div className="min-h-screen bg-slate-950 text-slate-100 grid place-items-center">
+        <div className="rounded-xl border border-white/10 bg-slate-900/60 p-6">Lädt…</div>
       </div>
     );
   }
 
-  if (auth.me) {
-    return <Navigate to="/" replace />;
-  }
-
-  return (
-    <div className="container">
-      <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
-        <div>
-          <h1>Haushalt Manager</h1>
-          <small className="muted">Anmelden, registrieren, Passwort zurücksetzen</small>
-        </div>
-
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <button onClick={() => navigate("/login")}>Login</button>
-          <button className="primary" onClick={() => navigate("/register")}>
-            Registrieren
-          </button>
-        </div>
-      </div>
-
-      <hr />
-      <Outlet />
-    </div>
-  );
+  if (auth.me) return <Navigate to={ROUTES.DASHBOARD} replace />;
+  return <Outlet />;
 }
 
 function AuthedRoot({ auth }) {
-  // ✅ WICHTIG: me MUSS rein, sonst lädt DashboardContext nach F5 nichts
+  if (auth.loadingMe) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 grid place-items-center">
+        <div className="rounded-xl border border-white/10 bg-slate-900/60 p-6">Lädt…</div>
+      </div>
+    );
+  }
+
+  if (!auth.me) return <Navigate to="/login" replace />;
+
   return (
     <DashboardProvider me={auth.me}>
       <AuthedLayout auth={auth} />
@@ -72,7 +59,7 @@ export default function App() {
 
   return (
     <Routes>
-      {/* Public routes */}
+      {/* Public */}
       <Route element={<PublicLayout auth={auth} />}>
         <Route path="/login" element={<LoginPage auth={auth} />} />
         <Route path="/register" element={<RegisterPage auth={auth} />} />
@@ -81,20 +68,21 @@ export default function App() {
         <Route path="/accept" element={<AcceptInvitePage auth={auth} />} />
       </Route>
 
-      {/* Authed routes */}
-      <Route path="/" element={<AuthedRoot auth={auth} />}>
+      {/* Authed */}
+      <Route path={ROUTES.DASHBOARD} element={<AuthedRoot auth={auth} />}>
         <Route index element={<DashboardPage />} />
-        <Route path="tasks" element={<TasksPage />} />
-        <Route path="calendar" element={<CalendarPage />} />
-        <Route path="shopping" element={<ShoppingPage />} />
-        <Route path="finances" element={<FinancesPage />} />
-        <Route path="household" element={<HouseholdPage />} />
-        <Route path="categories" element={<CategoriesPage />} />
-        <Route path="settings" element={<SettingsPage />} />
+        <Route path={ROUTES.TASKS.slice(1)} element={<TasksPage />} />
+        <Route path={ROUTES.CALENDAR.slice(1)} element={<CalendarPage />} />
+        <Route path={ROUTES.SHOPPING.slice(1)} element={<ShoppingPage />} />
+        <Route path={ROUTES.FINANCES.slice(1)} element={<FinancesPage />} />
+        <Route path={ROUTES.HOUSEHOLD.slice(1)} element={<HouseholdPage />} />
+        <Route path={ROUTES.CATEGORIES.slice(1)} element={<CategoriesPage />} />
+        <Route path={ROUTES.BACKUP.slice(1)} element={<BackupPage />} />
+        <Route path={ROUTES.SETTINGS.slice(1)} element={<SettingsPage />} />
       </Route>
 
-      {/* Fallback */}
-      <Route path="*" element={<Navigate to="/" replace />} />
+      {/* Catch-all */}
+      <Route path="*" element={<Navigate to={ROUTES.DASHBOARD} replace />} />
     </Routes>
   );
 }

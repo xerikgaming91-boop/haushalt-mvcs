@@ -1,4 +1,3 @@
-// client/src/views/layouts/AuthedLayout.jsx
 import React, { useMemo, useState } from "react";
 import { NavLink, Navigate, Outlet, useNavigate } from "react-router-dom";
 import {
@@ -14,8 +13,10 @@ import {
   TagIcon,
   Cog6ToothIcon,
   ArrowLeftOnRectangleIcon,
+  ArrowDownTrayIcon,
   BanknotesIcon,
 } from "@heroicons/react/24/outline";
+import { ROUTES } from "../../app/routes.js";
 
 function cn(...classes) {
   return classes.filter(Boolean).join(" ");
@@ -29,9 +30,7 @@ function NavItem({ to, icon: Icon, label, onNavigate }) {
       className={({ isActive }) =>
         cn(
           "group flex gap-x-3 rounded-md p-2 text-sm font-semibold",
-          isActive
-            ? "bg-white/10 text-white"
-            : "text-slate-300 hover:bg-white/5 hover:text-white"
+          isActive ? "bg-white/10 text-white" : "text-slate-300 hover:bg-white/5 hover:text-white"
         )
       }
     >
@@ -61,14 +60,15 @@ export function AuthedLayout({ auth }) {
 
   const navigation = useMemo(
     () => [
-      { to: "/", label: "Übersicht", icon: HomeIcon },
-      { to: "/tasks", label: "Aufgaben", icon: ClipboardDocumentListIcon },
-      { to: "/calendar", label: "Kalender", icon: CalendarDaysIcon },
-      { to: "/shopping", label: "Einkauf", icon: ShoppingCartIcon },
-      { to: "/finances", label: "Finanzen", icon: BanknotesIcon },
-      { to: "/household", label: "Haushalt", icon: UsersIcon },
-      { to: "/categories", label: "Kategorien", icon: TagIcon },
-      { to: "/settings", label: "Settings", icon: Cog6ToothIcon },
+      { to: ROUTES.DASHBOARD, label: "Übersicht", icon: HomeIcon },
+      { to: ROUTES.TASKS, label: "Aufgaben", icon: ClipboardDocumentListIcon },
+      { to: ROUTES.CALENDAR, label: "Kalender", icon: CalendarDaysIcon },
+      { to: ROUTES.SHOPPING, label: "Einkauf", icon: ShoppingCartIcon },
+      { to: ROUTES.FINANCES, label: "Finanzen", icon: BanknotesIcon },
+      { to: ROUTES.HOUSEHOLD, label: "Haushalt", icon: UsersIcon },
+      { to: ROUTES.CATEGORIES, label: "Kategorien", icon: TagIcon },
+      { to: ROUTES.BACKUP, label: "Backup", icon: ArrowDownTrayIcon },
+      { to: ROUTES.SETTINGS, label: "Settings", icon: Cog6ToothIcon },
     ],
     []
   );
@@ -85,33 +85,20 @@ export function AuthedLayout({ auth }) {
     return (
       <div className="min-h-full bg-slate-950 text-slate-100">
         <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-          <div className="rounded-xl border border-white/10 bg-slate-900/60 p-6">
-            Lädt…
-          </div>
+          <div className="rounded-xl border border-white/10 bg-slate-900/60 p-6">Lädt…</div>
         </div>
       </div>
     );
   }
 
-  if (!auth?.me) {
-    return <Navigate to="/login" replace />;
-  }
+  if (!auth?.me) return <Navigate to="/login" replace />;
 
   return (
     <div className="min-h-full bg-slate-950 text-slate-100">
       {/* Mobile overlay */}
-      <div
-        className={cn(
-          "fixed inset-0 z-50 lg:hidden",
-          sidebarOpen ? "" : "pointer-events-none"
-        )}
-        aria-hidden={!sidebarOpen}
-      >
+      <div className={cn("fixed inset-0 z-50 lg:hidden", sidebarOpen ? "" : "pointer-events-none")} aria-hidden={!sidebarOpen}>
         <div
-          className={cn(
-            "absolute inset-0 bg-black/60 transition-opacity",
-            sidebarOpen ? "opacity-100" : "opacity-0"
-          )}
+          className={cn("absolute inset-0 bg-black/60 transition-opacity", sidebarOpen ? "opacity-100" : "opacity-0")}
           onClick={() => setSidebarOpen(false)}
         />
         <div
@@ -122,12 +109,10 @@ export function AuthedLayout({ auth }) {
         >
           <div className="flex h-16 items-center justify-between px-4 border-b border-white/10">
             <div className="flex items-center gap-3">
-              <div className="grid h-9 w-9 place-items-center rounded-lg bg-sky-600/90 text-white font-black">
-                HM
-              </div>
+              <div className="grid h-9 w-9 place-items-center rounded-lg bg-sky-600/90 text-white font-black">HM</div>
               <div className="leading-tight">
                 <div className="text-sm font-semibold text-white">Haushalt Manager</div>
-                <div className="text-xs text-slate-400">Dark Shell</div>
+                <div className="text-xs text-slate-400">App</div>
               </div>
             </div>
 
@@ -143,13 +128,7 @@ export function AuthedLayout({ auth }) {
           <nav className="px-3 py-4">
             <div className="space-y-1">
               {navigation.map((n) => (
-                <NavItem
-                  key={n.to}
-                  to={n.to}
-                  icon={n.icon}
-                  label={n.label}
-                  onNavigate={() => setSidebarOpen(false)}
-                />
+                <NavItem key={n.to} to={n.to} icon={n.icon} label={n.label} onNavigate={() => setSidebarOpen(false)} />
               ))}
             </div>
 
@@ -172,18 +151,14 @@ export function AuthedLayout({ auth }) {
       {/* Desktop sidebar */}
       <aside className="hidden lg:fixed lg:inset-y-0 lg:z-40 lg:flex lg:w-72 lg:flex-col">
         <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-slate-900 px-6 pb-4 ring-1 ring-white/10">
-          {/* Header */}
           <div className="flex h-16 shrink-0 items-center gap-3 border-b border-white/10">
-            <div className="grid h-9 w-9 place-items-center rounded-lg bg-sky-600/90 text-white font-black">
-              HM
-            </div>
+            <div className="grid h-9 w-9 place-items-center rounded-lg bg-sky-600/90 text-white font-black">HM</div>
             <div className="leading-tight">
               <div className="text-sm font-semibold text-white">Haushalt Manager</div>
-              <div className="text-xs text-slate-400">Dark sidebar with header</div>
+              <div className="text-xs text-slate-400">Navigation</div>
             </div>
           </div>
 
-          {/* Nav */}
           <nav className="flex flex-1 flex-col">
             <ul role="list" className="flex flex-1 flex-col gap-y-7">
               <li>
@@ -196,7 +171,6 @@ export function AuthedLayout({ auth }) {
                 </ul>
               </li>
 
-              {/* Footer user */}
               <li className="-mx-2 mt-auto">
                 <div className="flex items-center gap-x-3 rounded-md p-2">
                   <div className="grid h-10 w-10 place-items-center rounded-full bg-white/10 text-sm font-bold text-white">
@@ -221,9 +195,7 @@ export function AuthedLayout({ auth }) {
         </div>
       </aside>
 
-      {/* Main column */}
       <div className="lg:pl-72">
-        {/* Top header */}
         <header className="sticky top-0 z-30 flex h-16 items-center gap-x-4 border-b border-white/10 bg-slate-950/80 px-4 backdrop-blur sm:gap-x-6 sm:px-6 lg:px-8">
           <button
             type="button"
@@ -234,7 +206,6 @@ export function AuthedLayout({ auth }) {
             <Bars3Icon className="h-6 w-6" />
           </button>
 
-          {/* Search */}
           <div className="flex flex-1 items-center">
             <div className="relative w-full max-w-xl">
               <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
@@ -246,7 +217,6 @@ export function AuthedLayout({ auth }) {
             </div>
           </div>
 
-          {/* Right actions */}
           <div className="flex items-center gap-x-2 sm:gap-x-3">
             <button
               onClick={() => navigate("/notifications")}
@@ -259,7 +229,7 @@ export function AuthedLayout({ auth }) {
             </button>
 
             <button
-              onClick={() => navigate("/settings")}
+              onClick={() => navigate(ROUTES.SETTINGS)}
               className="inline-flex items-center gap-x-2 rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800/60"
               aria-label="Profil/Settings"
               title="Profil/Settings"
@@ -272,7 +242,6 @@ export function AuthedLayout({ auth }) {
           </div>
         </header>
 
-        {/* Constrained content */}
         <main className="py-8">
           <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
             <Outlet />

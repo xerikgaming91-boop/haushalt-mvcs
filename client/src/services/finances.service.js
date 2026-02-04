@@ -1,5 +1,7 @@
 // client/src/services/finances.service.js
-// MVP: localStorage Storage (pro Haushalt), jetzt inkl. wiederkehrender Buchungen (Serie).
+// LocalStorage Storage (pro Haushalt) inkl. wiederkehrender Buchungen (Serie)
+// + Exceptions: "nur dieses Vorkommen" (OVERRIDE / SKIP / CLEAR)
+//
 // WICHTIG: Keine JSX hier.
 
 const LS_PREFIX = "hh_finances_";
@@ -102,6 +104,75 @@ function normalizeRecurrence(rec) {
   return { type: "NONE" };
 }
 
+// --- Exceptions (nur dieses Vorkommen) --------------------------------------
+// Stored on template entry:
+// exceptions: {
+//   "2026-02-14": { action: "SKIP" }
+//   "2026-02-20": { action: "OVERRIDE", patch: { amountCents, title, note, type } }
+// }
+
+function normalizeExceptionAction(action) {
+  const a = (action || "").toString().toUpperCase();
+  if (a === "SKIP" || a === "OVERRIDE" || a === "CLEAR") return a;
+  return null;
+}
+
+function sanitizeExceptionPatch(patch) {
+  const out = {};
+
+  if (patch?.type) {
+    out.type = patch.type === "EXPENSE" ? "EXPENSE" : "INCOME";
+  }
+
+  if (patch?.title !== undefined) {
+    out.title = clampString(patch.title, 80);
+  }
+
+  if (patch?.note !== undefined) {
+    out.note = clampString(patch.note, 500);
+  }
+
+  if (patch?.amountCents !== undefined) {
+    const v = Number(patch.amountCents);
+    if (!Number.isFinite(v) || v <= 0) {
+      throw new Error("Exception-Betrag muss > 0 sein.");
+    }
+    out.amountCents = Math.round(v);
+  }
+
+  return out;
+}
+
+function applyOccurrenceException(occ, template, ymd) {
+  const exMap = template?.exceptions && typeof template.exceptions === "object" ? template.exceptions : null;
+  const ex = exMap ? exMap[ymd] : null;
+
+  if (!ex || typeof ex !== "object") return occ;
+
+  const action = normalizeExceptionAction(ex.action);
+  if (action === "SKIP") return null;
+
+  if (action === "OVERRIDE") {
+    const patch = ex.patch && typeof ex.patch === "object" ? ex.patch : {};
+    const next = { ...occ };
+
+    if (patch.type) next.type = patch.type === "EXPENSE" ? "EXPENSE" : "INCOME";
+    if (patch.title !== undefined) next.title = clampString(patch.title, 80) || next.title;
+    if (patch.note !== undefined) next.note = clampString(patch.note, 500);
+    if (patch.amountCents !== undefined) {
+      const v = Number(patch.amountCents);
+      if (Number.isFinite(v) && v > 0) next.amountCents = Math.round(v);
+    }
+
+    next.isException = true;
+    next.exceptionAction = "OVERRIDE";
+    next.exceptionDate = ymd;
+    return next;
+  }
+
+  return occ;
+}
+
 function expandRecurring(template, from, to) {
   // Returns occurrence items within [from..to] inclusive.
   const rec = normalizeRecurrence(template.recurrence);
@@ -123,8 +194,7 @@ function expandRecurring(template, from, to) {
     if (!ymdInRange(ymd, from, endYMD)) return;
     if (ymd < startYMD) return;
 
-    out.push({
-      // occurrence id is unique per date
+    const baseOcc = {
       id: `${template.id}|${ymd}`,
       baseId: template.id,
       isRecurring: true,
@@ -137,11 +207,16 @@ function expandRecurring(template, from, to) {
       createdAt: template.createdAt,
       updatedAt: template.updatedAt,
       recurrence: rec,
-    });
+      isException: false,
+      exceptionAction: null,
+      exceptionDate: null,
+    };
+
+    const finalOcc = applyOccurrenceException(baseOcc, template, ymd);
+    if (finalOcc) out.push(finalOcc);
   };
 
   if (rec.type === "DAILY") {
-    // find first occurrence >= from
     let d = new Date(startDate);
 
     if (from && from > startYMD) {
@@ -161,18 +236,14 @@ function expandRecurring(template, from, to) {
   }
 
   if (rec.type === "WEEKLY") {
-    // Determine weekdays: if not provided use weekday of start date
     const wds = rec.byWeekday && rec.byWeekday.length ? rec.byWeekday : [weekdayMon0(startDate)];
 
-    // week anchor: Monday of start week
     const startWeek = new Date(startDate);
     startWeek.setDate(startWeek.getDate() - weekdayMon0(startWeek)); // back to Monday
 
-    // find first week >= from (step interval weeks)
     let week = new Date(startWeek);
 
     if (from && from > toISODate(startDate)) {
-      // compute weeks difference from startWeek to fromDate
       const fromWeek = new Date(fromDate);
       fromWeek.setDate(fromWeek.getDate() - weekdayMon0(fromWeek));
       const diffWeeks = Math.floor((fromWeek - startWeek) / (7 * 24 * 3600 * 1000));
@@ -182,9 +253,8 @@ function expandRecurring(template, from, to) {
     }
 
     while (week <= toDate) {
-      // add occurrences for each weekday in this week
       for (const wd of wds) {
-        const occ = addDaysDate(week, wd); // Monday + wd
+        const occ = addDaysDate(week, wd);
         if (occ < startDate) continue;
         if (occ > toDate) continue;
         pushOcc(occ);
@@ -192,25 +262,20 @@ function expandRecurring(template, from, to) {
       week = addDaysDate(week, rec.interval * 7);
     }
 
-    // sort occurrences within range
-    out.sort((a, b) => (a.date < b.date ? 1 : -1));
+    out.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
     return out;
   }
 
   if (rec.type === "MONTHLY") {
-    // day in month: byMonthday or day of start
     const day = rec.byMonthday || new Date(startYMD + "T00:00:00").getDate();
 
-    // first occurrence month = start month, at `day`, but not before start date
     let d = new Date(startDate);
     d.setDate(1);
     d.setDate(Math.min(day, 31));
-    // if the chosen day produced rollover, clamp later
     if (d.getMonth() !== new Date(startDate).getMonth()) {
       d.setDate(0);
     }
 
-    // ensure >= start date (if day earlier than start day)
     if (d < startDate) {
       d = addMonthsDate(d, rec.interval);
       d.setDate(1);
@@ -218,7 +283,6 @@ function expandRecurring(template, from, to) {
       if (d.getDate() !== Math.min(day, 31)) d.setDate(0);
     }
 
-    // move forward to from
     if (from && from > startYMD) {
       while (toISODate(d) < from) {
         d = addMonthsDate(d, rec.interval);
@@ -252,6 +316,7 @@ export const financesService = {
    * IMPORTANT:
    * - one-time entries: included as-is
    * - recurring templates: expanded into occurrences within range
+   * - exceptions on template are applied to occurrences
    */
   async list({ householdId, from, to }) {
     const all = loadAll(householdId);
@@ -268,30 +333,22 @@ export const financesService = {
             isRecurring: false,
             seriesStartDate: null,
             recurrence: rec,
+            isException: false,
+            exceptionAction: null,
+            exceptionDate: null,
           });
         }
       } else {
-        // recurring template: expand occurrences
         items.push(...expandRecurring(e, from, to));
       }
     }
 
-    // newest first
     items.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
     return { items };
   },
 
   /**
    * Create entry or recurring template
-   * dto: {
-   *  householdId,
-   *  type: "INCOME"|"EXPENSE",
-   *  title,
-   *  amountCents,
-   *  date (YYYY-MM-DD start/one-time),
-   *  note,
-   *  recurrence?: { type: NONE|DAILY|WEEKLY|MONTHLY, interval, byWeekday, byMonthday, endDate }
-   * }
    */
   async create(dto) {
     const householdId = dto?.householdId;
@@ -317,6 +374,7 @@ export const financesService = {
       amountCents: Math.round(amountCents),
       date: isoDate, // start date / one-time date
       recurrence, // always normalized
+      exceptions: {}, // <-- neu: exceptions map (nur relevant für Serie)
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -330,6 +388,10 @@ export const financesService = {
 
   /**
    * Update entry/template by base id
+   *
+   * Supports:
+   * - normal fields: type/title/note/date/amountCents/recurrence
+   * - setException: { date, action: "SKIP"|"OVERRIDE"|"CLEAR", patch? }
    */
   async update(householdId, id, patch) {
     const all = loadAll(householdId);
@@ -352,6 +414,33 @@ export const financesService = {
 
     if (patch?.recurrence !== undefined) {
       next.recurrence = normalizeRecurrence(patch.recurrence);
+    }
+
+    // Exceptions
+    if (patch?.setException && typeof patch.setException === "object") {
+      const action = normalizeExceptionAction(patch.setException.action);
+      if (!action) throw new Error("Ungültige Exception-Action.");
+
+      const ymd = patch.setException.date ? toISODate(patch.setException.date) : null;
+      if (!ymd) throw new Error("Exception-Date fehlt.");
+
+      const rec = normalizeRecurrence(next.recurrence);
+      if (rec.type === "NONE") {
+        throw new Error("Exceptions sind nur bei Serien möglich.");
+      }
+
+      const exMap = next.exceptions && typeof next.exceptions === "object" ? { ...next.exceptions } : {};
+
+      if (action === "CLEAR") {
+        delete exMap[ymd];
+      } else if (action === "SKIP") {
+        exMap[ymd] = { action: "SKIP" };
+      } else if (action === "OVERRIDE") {
+        const sanitized = sanitizeExceptionPatch(patch.setException.patch || {});
+        exMap[ymd] = { action: "OVERRIDE", patch: sanitized };
+      }
+
+      next.exceptions = exMap;
     }
 
     next.updatedAt = new Date().toISOString();
